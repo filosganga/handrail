@@ -1,0 +1,44 @@
+val catsV = "2.6.1"
+val catsEffectV = "3.2.9"
+val catsParseV = "0.3.4"
+val enumeratumV = "1.7.0"
+val caseInsensitiveV = "1.2.0"
+val munitV = "0.7.29"
+val munitCatsEffectV = "1.0.6"
+val scalacheckEffectV = "1.0.3"
+val log4j2V = "2.14.1"
+val log4catsV = "2.1.1"
+
+Global / onChangedBuildSource := ReloadOnSourceChanges
+
+ThisBuild / scalaVersion := "2.13.6"
+ThisBuild / organizationName := "really"
+ThisBuild / dynverSeparator := "-"
+ThisBuild / evictionErrorLevel := Level.Warn
+ThisBuild / organization := "com.github.filosganga"
+ThisBuild / organizationHomepage := Some(url("https://filippodeluca.com"))
+ThisBuild / homepage := Some(url("https://github.com/filosganga/handrail"))
+ThisBuild / scmInfo := Some(
+  ScmInfo(url("https://github.com/filosganga/handrail"), "scm:git:git@github.com:filosganga/handrail.git")
+)
+ThisBuild / licenses := Seq("Apache-2.0" -> url("https://opensource.org/licenses/apache-2.0"))
+ThisBuild / developers := List(
+  Developer("filippo.deluca", "Filippo De Luca", "me@filippodeluca.com", url("https://filippodeluca.com"))
+)
+
+lazy val handrail = (project in file(".")).settings(
+  name := "handrail",
+  description := "Handlebars parser in scala",
+  libraryDependencies ++= Seq(
+    "org.scalameta" %% "munit" % munitV % Test,
+    "org.scalameta" %% "munit-scalacheck" % munitV % Test,
+    "org.typelevel" %% "munit-cats-effect-3" % munitCatsEffectV % Test,
+    "org.typelevel" %% "scalacheck-effect-munit" % scalacheckEffectV % Test,
+    "com.beachape" %% "enumeratum" % enumeratumV,
+    "org.typelevel" %% "cats-core" % catsV,
+    "org.typelevel" %% "cats-effect" % catsEffectV,
+    "org.typelevel" %% "cats-parse" % catsParseV,
+    "org.typelevel" %% "log4cats-slf4j" % log4catsV,
+    "org.apache.logging.log4j" % "log4j-slf4j-impl" % log4j2V % Test
+  )
+)
