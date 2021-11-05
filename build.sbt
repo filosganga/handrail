@@ -8,11 +8,13 @@ val munitCatsEffectV = "1.0.6"
 val scalacheckEffectV = "1.0.3"
 val log4j2V = "2.14.1"
 val log4catsV = "2.1.1"
+val fs2V = "3.2.2"
+val apacheCommonsTextV = "1.9"
 
 Global / onChangedBuildSource := ReloadOnSourceChanges
 
-ThisBuild / scalaVersion := "2.13.6"
-ThisBuild / organizationName := "really"
+ThisBuild / scalaVersion := "2.13.7"
+ThisBuild / organizationName := "Filippo De Luca"
 ThisBuild / dynverSeparator := "-"
 ThisBuild / evictionErrorLevel := Level.Warn
 ThisBuild / organization := "com.github.filosganga"
@@ -38,7 +40,10 @@ lazy val handrail = (project in file(".")).settings(
     "org.typelevel" %% "cats-core" % catsV,
     "org.typelevel" %% "cats-effect" % catsEffectV,
     "org.typelevel" %% "cats-parse" % catsParseV,
+    "co.fs2" %% "fs2-core" % fs2V,
+    "co.fs2" %% "fs2-io" % fs2V,
     "org.typelevel" %% "log4cats-slf4j" % log4catsV,
+    "org.apache.commons" % "commons-text" % apacheCommonsTextV,
     "org.apache.logging.log4j" % "log4j-slf4j-impl" % log4j2V % Test
   )
 )

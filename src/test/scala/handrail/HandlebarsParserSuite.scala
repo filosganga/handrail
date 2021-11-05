@@ -144,33 +144,33 @@ class HandlebarsParserSuite extends munit.FunSuite {
     assertEquals(clue(result), ast.Ref("foo", escaped = false, eatSpace = ast.EatSpace.Both).asRight[Parser.Error])
   }
 
-  test("Comment should parse an unescaped comment") {
-    val source = "{{! foo bar }}"
-    val result = Comment.parseAll(source)
+  // test("Comment should parse an unescaped comment") {
+  //   val source = "{{! foo bar }}"
+  //   val result = Comment.parseAll(source)
 
-    assertEquals(clue(result), ast.Comment("foo bar").asRight[Parser.Error])
-  }
+  //   assertEquals(clue(result), ast.Comment("foo bar").asRight[Parser.Error])
+  // }
 
-  test("Comment should parse an unescaped comment with EatSpace.Left") {
-    val source = "{{~! foo bar }}"
-    val result = Comment.parseAll(source)
+  // test("Comment should parse an unescaped comment with EatSpace.Left") {
+  //   val source = "{{~! foo bar }}"
+  //   val result = Comment.parseAll(source)
 
-    assertEquals(clue(result), ast.Comment("foo bar", eatSpace = ast.EatSpace.Left).asRight[Parser.Error])
-  }
+  //   assertEquals(clue(result), ast.Comment("foo bar", eatSpace = ast.EatSpace.Left).asRight[Parser.Error])
+  // }
 
-  test("Comment should parse an unescaped comment with EatSpace.Right") {
-    val source = "{{! foo bar ~}}"
-    val result = Comment.parseAll(source)
+  // test("Comment should parse an unescaped comment with EatSpace.Right") {
+  //   val source = "{{! foo bar ~}}"
+  //   val result = Comment.parseAll(source)
 
-    assertEquals(clue(result), ast.Comment("foo bar", eatSpace = ast.EatSpace.Right).asRight[Parser.Error])
-  }
+  //   assertEquals(clue(result), ast.Comment("foo bar", eatSpace = ast.EatSpace.Right).asRight[Parser.Error])
+  // }
 
-  test("Comment should parse an unescaped comment with EatSpace.Both") {
-    val source = "{{~! foo bar ~}}"
-    val result = Comment.parseAll(source)
+  // test("Comment should parse an unescaped comment with EatSpace.Both") {
+  //   val source = "{{~! foo bar ~}}"
+  //   val result = Comment.parseAll(source)
 
-    assertEquals(clue(result), ast.Comment("foo bar", eatSpace = ast.EatSpace.Both).asRight[Parser.Error])
-  }
+  //   assertEquals(clue(result), ast.Comment("foo bar", eatSpace = ast.EatSpace.Both).asRight[Parser.Error])
+  // }
 }
 
 // class ParserSpec extends WordSpec with Matchers {

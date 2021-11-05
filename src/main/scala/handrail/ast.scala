@@ -48,6 +48,24 @@ object ast {
   // TODO it should contain an helper
   case class Block(
       name: String,
-      eatSpace: EatSpace = EatSpace.None
+      eatSpace: EatSpace = EatSpace.None,
+      children: List[Ast]
   ) extends Ast
+
+  sealed trait Expression
+  object Expression {
+    sealed trait Value extends Expression
+    object Value {
+      case class String(value: scala.Predef.String) extends Value
+      case class Number(value: scala.Double) extends Value
+      case class Boolean(value: scala.Boolean) extends Value
+      case class Object(value: Map[scala.Predef.String, Expression.Value]) extends Value
+      case object Void extends Value
+    }
+    case class Function(
+        name: String,
+        positionalArguments: List[Expression] = List.empty,
+        namedArguments: Map[String, Expression] = Map.empty
+    ) extends Expression
+  }
 }
