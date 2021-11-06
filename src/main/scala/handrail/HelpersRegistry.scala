@@ -24,14 +24,13 @@ import cats.MonadThrow
  * {{#if foo.bar baz=qux}}foo{{else}}bar{{/if}} => render(if(posArgs = List(lookup(context, "foo.bar")), namedArgs = Map("baz", lookup(context, "qux")))
  *
  */
-trait Helper[F[_]] {
+trait Helper {
   def apply(
       positionalArgs: List[Expression],
       nominalArgs: Map[String, Expression],
       data: Expression.Value,
-      eval: (Expression, Expression.Value) => F[Expression.Value],
-      output: Output[F]
-  ): F[Expression.Value]
+      eval: (Expression, Expression.Value) => Expression.Value
+  ): Expression.Value
 }
 
 object Helper {
@@ -39,215 +38,169 @@ object Helper {
   // TODO pass in the context/scope
   val logger = Slf4jLogger.getLogger[IO]
 
-  def render[F[_]: MonadThrow]: Helper[F] = new Helper[F] {
-    def apply(
-        positionalArgs: List[Expression],
-        nominalArgs: Map[String, Expression],
-        data: Expression.Value,
-        eval: (Expression, Expression.Value) => F[Expression.Value],
-        output: Output[F]
-    ): F[Expression.Value] = {
-      val value = MonadThrow[F].fromOption(
-        nominalArgs
-          .get("value")
-          .orElse(positionalArgs.headOption),
-        throw new RuntimeException("argument 'value' not found")
-      )
+  val render: Helper = (
+      positionalArgs: List[Expression],
+      nominalArgs: Map[String, Expression],
+      data: Expression.Value,
+      eval: (Expression, Expression.Value) => Expression.Value
+  ) => {
+    val value = nominalArgs
+      .get("value")
+      .orElse(positionalArgs.headOption)
+      .getOrElse(throw new RuntimeException("argument 'value' not found"))
 
-      value
-        .flatMap(exp => eval(exp, data))
-        .flatMap {
-          case Expression.Value.String(value) => value.pure[F]
-          case Expression.Value.Boolean(value) => value.toString.pure[F]
-          case Expression.Value.Number(value) => value.toString.pure[F]
-          case Expression.Value.Object(value) => value.toString.pure[F]
-          case Expression.Value.Void => "".pure[F]
-        }
-        .flatMap(value => output.append(value.toString))
-        .as(Expression.Value.Void)
+    eval(value, data) match {
+      case value: Expression.Value.String => value
+      case Expression.Value.Boolean(value) => Expression.Value.String(value.toString)
+      case Expression.Value.Number(value) => Expression.Value.String(value.toString)
+      case Expression.Value.Object(value) => Expression.Value.String(value.toString)
+      case Expression.Value.Void => Expression.Value.String("")
     }
   }
 
-  def escape[F[_]: MonadThrow]: Helper[F] = (
+  val escape: Helper = (
       positionalArgs: List[Expression],
       nominalArgs: Map[String, Expression],
       data: Expression.Value,
-      eval: (Expression, Expression.Value) => F[Expression.Value],
-      output: Output[F]
+      eval: (Expression, Expression.Value) => Expression.Value
   ) => {
-    val value = MonadThrow[F].fromOption(
-      nominalArgs
-        .get("value")
-        .orElse(positionalArgs.headOption),
-      throw new RuntimeException("argument 'value' not found")
-    )
+    val value = nominalArgs
+      .get("value")
+      .orElse(positionalArgs.headOption)
+      .getOrElse(throw new RuntimeException("argument 'value' not found"))
 
-    value
-      .flatMap(exp => eval(exp, data))
-      .flatMap {
-        case Expression.Value.String(value) => value.pure[F]
-        case Expression.Value.Boolean(value) => value.toString.pure[F]
-        case Expression.Value.Number(value) => value.toString.pure[F]
-        case Expression.Value.Object(value) => value.toString.pure[F]
-        case Expression.Value.Void => "".pure[F]
-      }
-      .flatMap { value =>
-        MonadThrow[F].catchNonFatal(StringEscapeUtils.escapeHtml4(value)).map(Expression.Value.String(_))
-      }
+    eval(value, data) match {
+      case Expression.Value.String(value) => Expression.Value.String(StringEscapeUtils.escapeHtml4(value))
+      case Expression.Value.Boolean(value) => Expression.Value.String(StringEscapeUtils.escapeHtml4(value.toString))
+      case Expression.Value.Number(value) => Expression.Value.String(StringEscapeUtils.escapeHtml4(value.toString))
+      case Expression.Value.Object(value) => Expression.Value.String(StringEscapeUtils.escapeHtml4(value.toString))
+      case Expression.Value.Void => Expression.Value.String("")
+    }
   }
 
-  def lookup[F[_]: MonadThrow]: Helper[F] = (
+  val lookup: Helper = (
       positionalArgs: List[Expression],
       nominalArgs: Map[String, Expression],
       data: Expression.Value,
-      eval: (Expression, Expression.Value) => F[Expression.Value],
-      output: Output[F]
+      eval: (Expression, Expression.Value) => Expression.Value
   ) => {
-    val dataF = MonadThrow[F]
-      .fromOption(
-        nominalArgs
-          .get("data")
-          .orElse(positionalArgs.headOption),
-        throw new RuntimeException("argument 'data' not found")
-      )
-      .flatMap(exp => eval(exp, data))
+    val targetExp = nominalArgs
+      .get("target")
+      .orElse(positionalArgs.headOption)
+      .getOrElse(throw new RuntimeException("argument 'target' not found"))
 
-    val propertyF: F[String] = MonadThrow[F]
-      .fromOption(
-        nominalArgs
-          .get("property")
-          .orElse(positionalArgs.get(1)),
-        throw new RuntimeException("argument 'property' not found")
-      )
-      .flatMap(exp => eval(exp, data))
-      .flatMap {
-        case Expression.Value.String(x) => x.pure[F]
-        case x: Expression.Value =>
-          MonadThrow[F].raiseError(new RuntimeException(s"value of property ${x} is not a String"))
-      }
+    val propertyExp = nominalArgs
+      .get("property")
+      .orElse(positionalArgs.get(1))
+      .getOrElse(throw new RuntimeException("argument 'property' not found"))
 
-    (dataF, propertyF).mapN { (data, property) =>
-      property match {
-        case "." => data.pure[F]
-        case ".." => data.pure[F] // TODO the parent
-        case key =>
-          data match {
-            case Expression.Value.Object(value) =>
-              // TODO use the missing helper
-              value.get(key).traverse(x => eval(x, data)).map { opt =>
-                opt.fold[Expression.Value](Expression.Value.Void)(identity)
-              }
+    val property = eval(propertyExp, data) match {
+      case Expression.Value.String(x) => x
+      case x: Expression.Value => throw new RuntimeException(s"value of property ${x} is not a String")
+    }
+
+    // TODO Can we return the expression instead of value from the helper?
+    val target = eval(targetExp, data)
+
+    property match {
+      case "." | "this" => target
+      case ".." => target
+      case key =>
+        target match {
+          case Expression.Value.Object(value) =>
             // TODO use the missing helper
-            case other => MonadThrow[F].raiseError[Expression.Value](new RuntimeException(s"${data} is not an object"))
-          }
-        // TODO handle other cases
-      }
-    }.flatten
+            value.getOrElse(key, Expression.Value.Void)
+          // TODO use the missing helper
+          case other => Expression.Value.Void
+        }
+    }
   }
 
   // {{#if foo.bar baz=qux}}foo{{else}}bar{{/if}} => render(if(posArgs = List(lookup(context, "foo.bar")), namedArgs = Map("baz", lookup(context, "qux")))
-  def `if`[F[_]: MonadThrow]: Helper[F] = (
+  val `if`: Helper = (
       positionalArgs: List[Expression],
       nominalArgs: Map[String, Expression],
       data: Expression.Value,
-      eval: (Expression, Expression.Value) => F[Expression.Value],
-      output: Output[F]
+      eval: (Expression, Expression.Value) => Expression.Value
   ) => {
-    val valueF = MonadThrow[F]
-      .fromOption(
-        nominalArgs
-          .get("value")
-          .orElse(positionalArgs.headOption),
-        throw new RuntimeException("argument 'value' not found")
-      )
-      .flatMap(exp => eval(exp, data))
-      .flatMap {
-        case Expression.Value.Boolean(value) => value.pure[F]
-        case Expression.Value.Void => false.pure[F]
-        case _ => true.pure[F]
-      }
 
-    val bodyF = MonadThrow[F]
-      .fromOption(
-        nominalArgs
-          .get("body"),
-        throw new RuntimeException("argument 'body' not found")
-      )
-      .flatMap(exp => eval(exp, data))
+    val valueExp = nominalArgs
+      .get("value")
+      .orElse(positionalArgs.headOption)
+      .getOrElse(throw new RuntimeException("argument 'value' not found"))
 
-    val elseF =
-      nominalArgs
-        .getOrElse("else", Expression.Value.Void)
-        .pure[F]
-        .flatMap(exp => eval(exp, data))
+    val value = eval(valueExp, data) match {
+      case Expression.Value.Boolean(value) => value
+      case Expression.Value.Void => false
+      case _ => true
+    }
 
-    valueF.ifM(
-      bodyF,
-      elseF
-    )
-  }
+    val bodyExp = nominalArgs
+      .getOrElse("body", throw new RuntimeException("argument 'body' not found"))
 
-  def not[F[_]: MonadThrow]: Helper[F] = (
-      positionalArgs: List[Expression],
-      nominalArgs: Map[String, Expression],
-      data: Expression.Value,
-      eval: (Expression, Expression.Value) => F[Expression.Value],
-      output: Output[F]
-  ) => {
-    MonadThrow[F]
-      .fromOption(
-        nominalArgs
-          .get("value")
-          .orElse(positionalArgs.headOption),
-        throw new RuntimeException("argument 'value' not found")
-      )
-      .flatMap(exp => eval(exp, data))
-      .flatMap {
-        case Expression.Value.Boolean(value) => value.pure[F]
-        case Expression.Value.Void => false.pure[F]
-        case _ => true.pure[F]
-      }
-      .map(x => Expression.Value.Boolean(!x))
-  }
+    val elseExp = nominalArgs
+      .getOrElse("else", Expression.Value.Void)
 
-  def unless[F[_]: MonadThrow]: Helper[F] = (
-      positionalArgs: List[Expression],
-      nominalArgs: Map[String, Expression],
-      data: Expression.Value,
-      eval: (Expression, Expression.Value) => F[Expression.Value],
-      output: Output[F]
-  ) => {
-    val valueF = MonadThrow[F]
-      .fromOption(
-        nominalArgs
-          .get("value")
-          .orElse(positionalArgs.headOption),
-        throw new RuntimeException("argument 'value' not found")
-      )
-      .map(exp => Expression.Function("not", List(exp)))
-
-    valueF.flatMap { value =>
-      eval(Expression.Function("if", List(value), nominalArgs - "value"), data)
+    // TODO Can we return the expression without evaluating it?
+    if (value) {
+      eval(bodyExp, data)
+    } else {
+      eval(elseExp, data)
     }
   }
 
+  val not: Helper = (
+      positionalArgs: List[Expression],
+      nominalArgs: Map[String, Expression],
+      data: Expression.Value,
+      eval: (Expression, Expression.Value) => Expression.Value
+  ) => {
+    val valueExp = nominalArgs
+      .get("value")
+      .orElse(positionalArgs.headOption)
+      .getOrElse(throw new RuntimeException("argument 'value' not found"))
+
+    // TODO Can we return the expression wrapped somehow instead?
+    eval(valueExp, data) match {
+      case Expression.Value.Boolean(value) => Expression.Value.Boolean(!value)
+      case Expression.Value.Void => Expression.Value.Boolean(true)
+      case _ => Expression.Value.Boolean(false)
+    }
+  }
+
+  val unless: Helper = (
+      positionalArgs: List[Expression],
+      nominalArgs: Map[String, Expression],
+      data: Expression.Value,
+      eval: (Expression, Expression.Value) => Expression.Value
+  ) => {
+    val valueExp = nominalArgs
+      .get("value")
+      .orElse(positionalArgs.headOption)
+      .getOrElse(throw new RuntimeException("argument 'value' not found"))
+
+    // TODO Can we return the expression wrapped somehow instead?
+    val newValue = Expression.Function("not", List(valueExp))
+    eval(Expression.Function("if", List(newValue), nominalArgs - "value"), data)
+  }
+
 }
 
-case class HelpersRegistry[F[_]](helpers: Map[String, Helper[F]]) {
-  def withHelper(name: String, helper: Helper[F]): HelpersRegistry[F] = copy(helpers + (name -> helper))
+case class HelpersRegistry(helpers: Map[String, Helper]) {
+  def withHelper(name: String, helper: Helper): HelpersRegistry = copy(helpers + (name -> helper))
 }
 
 object HelpersRegistry {
-  def empty[F[_]: MonadThrow] = HelpersRegistry[F](Map.empty)
-  def default[F[_]: MonadThrow] = empty
-    .withHelper("lookup", Helper.lookup[F])
+  val empty = HelpersRegistry(Map.empty)
+  val default = empty
+    .withHelper("lookup", Helper.lookup)
     .withHelper("render", Helper.render)
     .withHelper("escape", Helper.escape)
     .withHelper("if", Helper.`if`)
     .withHelper("not", Helper.not)
     .withHelper("unless", Helper.unless)
 
-  implicit def showForHelpersRegistry[F[_]]: Show[HelpersRegistry[F]] = Show.show { hr =>
+  implicit val showForHelpersRegistry: Show[HelpersRegistry] = Show.show { hr =>
     hr.helpers.keySet.mkString("[", ",", "]")
   }
 }

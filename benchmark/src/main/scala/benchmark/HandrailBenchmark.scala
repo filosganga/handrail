@@ -12,9 +12,7 @@ import org.typelevel.log4cats.slf4j.Slf4jLogger
 import com.github.jknack.handlebars._
 
 object HandrailBenchmark {
-  val logger = Slf4jLogger.getLogger[IO]
-  val registry = HelpersRegistry.default[IO]
-  val output = Output.devNull[IO]
+  val registry = HelpersRegistry.default
   val data = ast.Expression.Value.String("foo")
   val expression = ast.Expression.Function(
     "render",
@@ -42,21 +40,18 @@ class HandrailBenchmark {
   // @OutputTimeUnit(TimeUnit.SECONDS)
   // def handrail(): Unit = {
   //   Handrail
-  //     .eval[IO](
+  //     .eval(
   //       HandrailBenchmark.expression,
   //       HandrailBenchmark.data,
-  //       HandrailBenchmark.output,
-  //       HandrailBenchmark.registry,
-  //       HandrailBenchmark.logger
+  //       HandrailBenchmark.registry
   //     )
-  //     .unsafeRunSync()
   // }
 
-  // @Benchmark
-  // @BenchmarkMode(Array(Mode.Throughput))
-  // @OutputTimeUnit(TimeUnit.SECONDS)
-  // def handlebars(): Unit = {
-  //   HandrailBenchmark
-  //     .template("foo")
-  // }
+  @Benchmark
+  @BenchmarkMode(Array(Mode.Throughput))
+  @OutputTimeUnit(TimeUnit.SECONDS)
+  def handlebars(): Unit = {
+    HandrailBenchmark
+      .template("foo")
+  }
 }

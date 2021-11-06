@@ -7,12 +7,13 @@ import cats.effect._
 class HandrailSuite extends munit.CatsEffectSuite {
 
   val stringBuilderR = ResourceFixture(Resource.make(IO(new StringBuilder))(sb => IO(sb.clear)))
+
   /*
    * template: {{.}}
    * context: "foo"
    * result: "foo"
    */
-  stringBuilderR.test("it should render itself") { sb =>
+  test("it should render itself") {
     val data = ast.Expression.Value.String("foo")
     val expression = ast.Expression.Function(
       "render",
@@ -29,19 +30,17 @@ class HandrailSuite extends munit.CatsEffectSuite {
       Map.empty
     )
 
-    Handrail
+    val result = Handrail
       .eval(
         expression,
         data,
-        sb
+        HelpersRegistry.default
       )
-      .flatMap { _ =>
-        IO(sb.toString)
-      }
-      .assertEquals("foo")
+
+    assertEquals(result, ast.Expression.Value.String("foo"))
   }
 
-  stringBuilderR.test("it should render a property") { sb =>
+  test("it should render a property") {
     val data = ast.Expression.Value.Object(Map("foo" -> ast.Expression.Value.String("bar")))
     val expression = ast.Expression.Function(
       "render",
@@ -58,19 +57,17 @@ class HandrailSuite extends munit.CatsEffectSuite {
       Map.empty
     )
 
-    Handrail
+    val result = Handrail
       .eval(
         expression,
         data,
-        sb
+        HelpersRegistry.default
       )
-      .flatMap { _ =>
-        IO(sb.toString)
-      }
-      .assertEquals("bar")
+
+    assertEquals(result, ast.Expression.Value.String("bar"))
   }
 
-  stringBuilderR.test("it should escape HTML") { sb =>
+  test("it should escape HTML") {
     val data = ast.Expression.Value.Object(Map("foo" -> ast.Expression.Value.String("perché")))
     val expression = ast.Expression.Function(
       "render",
@@ -93,19 +90,17 @@ class HandrailSuite extends munit.CatsEffectSuite {
       Map.empty
     )
 
-    Handrail
+    val result = Handrail
       .eval(
         expression,
         data,
-        sb
+        HelpersRegistry.default
       )
-      .flatMap { _ =>
-        IO(sb.toString)
-      }
-      .assertEquals("perch&eacute;")
+
+    assertEquals(result, ast.Expression.Value.String("perch&eacute;"))
   }
 
-  stringBuilderR.test("{{#if}} should evaluate body when true") { sb =>
+  test("{{#if}} should evaluate body when true") {
     val data = ast.Expression.Value.Object(Map("foo" -> ast.Expression.Value.String("perché")))
     val expression = ast.Expression.Function(
       "render",
@@ -126,16 +121,14 @@ class HandrailSuite extends munit.CatsEffectSuite {
       Map.empty
     )
 
-    Handrail
+    val result = Handrail
       .eval(
         expression,
         data,
-        sb
+        HelpersRegistry.default
       )
-      .flatMap { _ =>
-        IO(sb.toString)
-      }
-      .assertEquals("foo")
+
+    assertEquals(result, ast.Expression.Value.String("foo"))
   }
 
   stringBuilderR.test("{{#if}} should evaluate else when false") { sb =>
@@ -163,19 +156,17 @@ class HandrailSuite extends munit.CatsEffectSuite {
       Map.empty
     )
 
-    Handrail
+    val result = Handrail
       .eval(
         expression,
         data,
-        sb
+        HelpersRegistry.default
       )
-      .flatMap { _ =>
-        IO(sb.toString)
-      }
-      .assertEquals("bar")
+
+    assertEquals(result, ast.Expression.Value.String("bar"))
   }
 
-  stringBuilderR.test("{{#unless}} should evaluate body when false") { sb =>
+  test("{{#unless}} should evaluate body when false") {
     val data = ast.Expression.Value.Object(Map("foo" -> ast.Expression.Value.String("perché")))
     val expression = ast.Expression.Function(
       "render",
@@ -200,19 +191,17 @@ class HandrailSuite extends munit.CatsEffectSuite {
       Map.empty
     )
 
-    Handrail
+    val result = Handrail
       .eval(
         expression,
         data,
-        sb
+        HelpersRegistry.default
       )
-      .flatMap { _ =>
-        IO(sb.toString)
-      }
-      .assertEquals("foo")
+
+    assertEquals(result, ast.Expression.Value.String("foo"))
   }
 
-  stringBuilderR.test("{{#unless}} should evaluate else when true") { sb =>
+  test("{{#unless}} should evaluate else when true") {
     val data = ast.Expression.Value.Object(Map("foo" -> ast.Expression.Value.String("perché")))
     val expression = ast.Expression.Function(
       "render",
@@ -237,15 +226,13 @@ class HandrailSuite extends munit.CatsEffectSuite {
       Map.empty
     )
 
-    Handrail
+    val result = Handrail
       .eval(
         expression,
         data,
-        sb
+        HelpersRegistry.default
       )
-      .flatMap { _ =>
-        IO(sb.toString)
-      }
-      .assertEquals("bar")
+
+    assertEquals(result, ast.Expression.Value.String("bar"))
   }
 }

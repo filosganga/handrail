@@ -99,6 +99,8 @@ object HandlebarsParser {
   lazy val StartCloseBlock: Parser[ast.EatSpace] =
     (TwoCloseCurlyBraces *> Tilde.? <* Slash).map(_.fold(ast.EatSpace.none)(_ => ast.EatSpace.right))
 
+  lazy val HelperP: Parser[ast.Expression.Function] = 
+
   // lazy val BlockName: Parser[String] = P(CharsWhile(c => c != '}' && c != ' ').!)
   // val BlockArguments: Parser[Seq[String]] = P(BlockName.rep(sep = (Space ~/ Pass).rep(min = 1)))
 

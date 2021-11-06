@@ -9,20 +9,6 @@ import org.typelevel.log4cats.slf4j.Slf4jLogger
 import org.typelevel.log4cats.StructuredLogger
 import cats.Applicative
 
-trait Output[F[_]] {
-  def append(value: String): F[Unit]
-}
-
-object Output {
-  def devNull[F[_]: Applicative] = new Output[F] {
-    def append(value: String): F[Unit] = ().pure[F]
-  }
-
-  def stringBuilder[F[_]: Sync](sb: StringBuilder) = new Output[F] {
-    def append(value: String): F[Unit] = Sync[F].delay(sb.append(value))
-  }
-}
-
 /*
  *
  * The argument of the functions are by default context property, unless they are number, or boolean, or in ""
@@ -38,32 +24,29 @@ object Output {
  */
 object Handrail {
 
-  def eval[F[_]: Sync](
+  def eval(
       expression: Expression,
       data: Expression.Value,
-      output: Output[F],
-      helpersRegistry: HelpersRegistry[F],
-      logger: StructuredLogger[F]
-  ): F[Expression.Value] = {
+      helpersRegistry: HelpersRegistry
+  ): Expression.Value = {
     expression match {
-      case value: Expression.Value => value.pure[F]
+      case value: Expression.Value => value
       case Expression.Function(name, posArgs, namedArgs) =>
-          Sync[F]
-            .fromOption(
-              helpersRegistry.helpers.get(name),
-              new RuntimeException(
-                show"Helper with name ${name} does not exist in the HelperRegistry ${helpersRegistry}"
-              )
+        val helper = helpersRegistry.helpers
+          // TODO Use missing helper
+          .getOrElse(
+            name,
+            throw new RuntimeException(
+              show"Helper with name ${name} does not exist in the HelperRegistry ${helpersRegistry}"
             )
-            .flatMap { helper =>
-              helper(
-                positionalArgs = posArgs,
-                nominalArgs = namedArgs,
-                data = data,
-                eval = (exp, data) => eval(exp, data, output, helpersRegistry, logger),
-                output = output
-              )
-            }
+          )
+
+        helper(
+          positionalArgs = posArgs,
+          nominalArgs = namedArgs,
+          data = data,
+          eval = (exp, data) => eval(exp, data, helpersRegistry)
+        )
     }
   }
 
