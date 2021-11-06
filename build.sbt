@@ -28,22 +28,33 @@ ThisBuild / developers := List(
   Developer("filippo.deluca", "Filippo De Luca", "me@filippodeluca.com", url("https://filippodeluca.com"))
 )
 
-lazy val handrail = (project in file(".")).settings(
-  name := "handrail",
-  description := "Handlebars parser in scala",
-  libraryDependencies ++= Seq(
-    "org.scalameta" %% "munit" % munitV % Test,
-    "org.scalameta" %% "munit-scalacheck" % munitV % Test,
-    "org.typelevel" %% "munit-cats-effect-3" % munitCatsEffectV % Test,
-    "org.typelevel" %% "scalacheck-effect-munit" % scalacheckEffectV % Test,
-    "com.beachape" %% "enumeratum" % enumeratumV,
-    "org.typelevel" %% "cats-core" % catsV,
-    "org.typelevel" %% "cats-effect" % catsEffectV,
-    "org.typelevel" %% "cats-parse" % catsParseV,
-    "co.fs2" %% "fs2-core" % fs2V,
-    "co.fs2" %% "fs2-io" % fs2V,
-    "org.typelevel" %% "log4cats-slf4j" % log4catsV,
-    "org.apache.commons" % "commons-text" % apacheCommonsTextV,
-    "org.apache.logging.log4j" % "log4j-slf4j-impl" % log4j2V % Test
+lazy val handrail = (project in file("."))
+  .settings(
+    name := "handrail",
+    description := "Handlebars parser in scala",
+    libraryDependencies ++= Seq(
+      "org.scalameta" %% "munit" % munitV % Test,
+      "org.scalameta" %% "munit-scalacheck" % munitV % Test,
+      "org.typelevel" %% "munit-cats-effect-3" % munitCatsEffectV % Test,
+      "org.typelevel" %% "scalacheck-effect-munit" % scalacheckEffectV % Test,
+      "com.beachape" %% "enumeratum" % enumeratumV,
+      "org.typelevel" %% "cats-core" % catsV,
+      "org.typelevel" %% "cats-effect" % catsEffectV,
+      "org.typelevel" %% "cats-parse" % catsParseV,
+      "co.fs2" %% "fs2-core" % fs2V,
+      "co.fs2" %% "fs2-io" % fs2V,
+      "org.typelevel" %% "log4cats-slf4j" % log4catsV,
+      "org.apache.commons" % "commons-text" % apacheCommonsTextV,
+      "org.apache.logging.log4j" % "log4j-slf4j-impl" % log4j2V % Test
+    )
   )
-)
+
+lazy val benchmark = (project in file("benchmark"))
+  .dependsOn(handrail)
+  .enablePlugins(JmhPlugin)
+  .settings(
+    name := "handrail-benchmark",
+    libraryDependencies ++= List(
+      "com.github.jknack" % "handlebars" % "4.3.0"
+    )
+  )

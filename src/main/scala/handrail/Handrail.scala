@@ -6,6 +6,22 @@ import cats.effect._
 import cats.syntax.all._
 
 import org.typelevel.log4cats.slf4j.Slf4jLogger
+import org.typelevel.log4cats.StructuredLogger
+import cats.Applicative
+
+trait Output[F[_]] {
+  def append(value: String): F[Unit]
+}
+
+object Output {
+  def devNull[F[_]: Applicative] = new Output[F] {
+    def append(value: String): F[Unit] = ().pure[F]
+  }
+
+  def stringBuilder[F[_]: Sync](sb: StringBuilder) = new Output[F] {
+    def append(value: String): F[Unit] = Sync[F].delay(sb.append(value))
+  }
+}
 
 /*
  *
@@ -22,34 +38,32 @@ import org.typelevel.log4cats.slf4j.Slf4jLogger
  */
 object Handrail {
 
-  // TODO pass in the context/scope
-  val logger = Slf4jLogger.getLogger[IO]
-
-  def eval(
+  def eval[F[_]: Sync](
       expression: Expression,
       data: Expression.Value,
-      output: StringBuilder,
-      helpersRegistry: HelpersRegistry = HelpersRegistry.default
-  ): IO[Expression.Value] = {
+      output: Output[F],
+      helpersRegistry: HelpersRegistry[F],
+      logger: StructuredLogger[F]
+  ): F[Expression.Value] = {
     expression match {
-      case value: Expression.Value => value.pure[IO]
+      case value: Expression.Value => value.pure[F]
       case Expression.Function(name, posArgs, namedArgs) =>
-        logger.info(s"Calling helper: ${name} with posArgs: ${posArgs} namedArgs: ${namedArgs}") *>
-          IO.fromOption(helpersRegistry.helpers.get(name))(
-            new RuntimeException(show"Helper with name ${name} does not exist in the HelperRegistry ${helpersRegistry}")
-          ).flatMap { helper =>
-            helper(
-              positionalArgs = posArgs,
-              nominalArgs = namedArgs,
-              data = data,
-              evaluator = (exp, data) => eval(exp, data, output, helpersRegistry),
-              output = output
+          Sync[F]
+            .fromOption(
+              helpersRegistry.helpers.get(name),
+              new RuntimeException(
+                show"Helper with name ${name} does not exist in the HelperRegistry ${helpersRegistry}"
+              )
             )
-          }.flatTap(result =>
-            logger.info(
-              s"Helper: ${name} with posArgs: ${posArgs} namedArgs: ${namedArgs} returned: ${result} output: ${output.toString}"
-            )
-          )
+            .flatMap { helper =>
+              helper(
+                positionalArgs = posArgs,
+                nominalArgs = namedArgs,
+                data = data,
+                eval = (exp, data) => eval(exp, data, output, helpersRegistry, logger),
+                output = output
+              )
+            }
     }
   }
 

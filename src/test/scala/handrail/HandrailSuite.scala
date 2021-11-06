@@ -104,4 +104,148 @@ class HandrailSuite extends munit.CatsEffectSuite {
       }
       .assertEquals("perch&eacute;")
   }
+
+  stringBuilderR.test("{{#if}} should evaluate body when true") { sb =>
+    val data = ast.Expression.Value.Object(Map("foo" -> ast.Expression.Value.String("perché")))
+    val expression = ast.Expression.Function(
+      "render",
+      List(
+        ast.Expression.Function(
+          "if",
+          List(
+            ast.Expression.Value.Boolean(true)
+          ),
+          Map(
+            "body" -> ast.Expression.Function(
+              "render",
+              List(ast.Expression.Value.String("foo"))
+            )
+          )
+        )
+      ),
+      Map.empty
+    )
+
+    Handrail
+      .eval(
+        expression,
+        data,
+        sb
+      )
+      .flatMap { _ =>
+        IO(sb.toString)
+      }
+      .assertEquals("foo")
+  }
+
+  stringBuilderR.test("{{#if}} should evaluate else when false") { sb =>
+    val data = ast.Expression.Value.Object(Map("foo" -> ast.Expression.Value.String("perché")))
+    val expression = ast.Expression.Function(
+      "render",
+      List(
+        ast.Expression.Function(
+          "if",
+          List(
+            ast.Expression.Value.Boolean(false)
+          ),
+          Map(
+            "body" -> ast.Expression.Function(
+              "render",
+              List(ast.Expression.Value.String("foo"))
+            ),
+            "else" -> ast.Expression.Function(
+              "render",
+              List(ast.Expression.Value.String("bar"))
+            )
+          )
+        )
+      ),
+      Map.empty
+    )
+
+    Handrail
+      .eval(
+        expression,
+        data,
+        sb
+      )
+      .flatMap { _ =>
+        IO(sb.toString)
+      }
+      .assertEquals("bar")
+  }
+
+  stringBuilderR.test("{{#unless}} should evaluate body when false") { sb =>
+    val data = ast.Expression.Value.Object(Map("foo" -> ast.Expression.Value.String("perché")))
+    val expression = ast.Expression.Function(
+      "render",
+      List(
+        ast.Expression.Function(
+          "unless",
+          List(
+            ast.Expression.Value.Boolean(false)
+          ),
+          Map(
+            "body" -> ast.Expression.Function(
+              "render",
+              List(ast.Expression.Value.String("foo"))
+            ),
+            "else" -> ast.Expression.Function(
+              "render",
+              List(ast.Expression.Value.String("bar"))
+            )
+          )
+        )
+      ),
+      Map.empty
+    )
+
+    Handrail
+      .eval(
+        expression,
+        data,
+        sb
+      )
+      .flatMap { _ =>
+        IO(sb.toString)
+      }
+      .assertEquals("foo")
+  }
+
+  stringBuilderR.test("{{#unless}} should evaluate else when true") { sb =>
+    val data = ast.Expression.Value.Object(Map("foo" -> ast.Expression.Value.String("perché")))
+    val expression = ast.Expression.Function(
+      "render",
+      List(
+        ast.Expression.Function(
+          "unless",
+          List(
+            ast.Expression.Value.Boolean(true)
+          ),
+          Map(
+            "body" -> ast.Expression.Function(
+              "render",
+              List(ast.Expression.Value.String("foo"))
+            ),
+            "else" -> ast.Expression.Function(
+              "render",
+              List(ast.Expression.Value.String("bar"))
+            )
+          )
+        )
+      ),
+      Map.empty
+    )
+
+    Handrail
+      .eval(
+        expression,
+        data,
+        sb
+      )
+      .flatMap { _ =>
+        IO(sb.toString)
+      }
+      .assertEquals("bar")
+  }
 }
