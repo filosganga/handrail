@@ -8,11 +8,16 @@ object HandlebarsParser {
   lazy val WhiteSpace: Parser[Unit] = Parser.charIn(' ', '\t', '\n', '\r').void
   lazy val OpenCurlyBrace: Parser[Unit] = Parser.char('{')
   lazy val CloseCurlyBrace: Parser[Unit] = Parser.char('}')
+  lazy val OpenParen: Parser[Unit] = Parser.char('(')
+  lazy val CloseParen: Parser[Unit] = Parser.char(')')
   lazy val Bang: Parser[Unit] = Parser.char('!')
   lazy val Sharp: Parser[Unit] = Parser.char('#')
   lazy val Slash: Parser[Unit] = Parser.char('/')
   lazy val Tilde: Parser[Unit] = Parser.char('~')
   lazy val Hyphen: Parser[Unit] = Parser.char('-')
+  lazy val Equal: Parser[Unit] = Parser.char('=')
+  lazy val Quote: Parser[Unit] = Parser.char('"')
+  lazy val Stop = WhiteSpace | CloseParen | CloseCurlyBrace | Parser.end
 
   lazy val Identifier: Parser[String] =
     (Parser.charWhere(_.isLetter) ~ Parser.until(
@@ -99,8 +104,70 @@ object HandlebarsParser {
   lazy val StartCloseBlock: Parser[ast.EatSpace] =
     (TwoCloseCurlyBraces *> Tilde.? <* Slash).map(_.fold(ast.EatSpace.none)(_ => ast.EatSpace.right))
 
-  lazy val HelperP: Parser[ast.Expression.Function] = 
+  lazy val HelperP: Parser[ast.Expression.Function] =
+    (HelperNameP ~ (WhiteSpace.rep *> PositionalParametersP).?.map(
+      _.getOrElse(List.empty)
+    ) ~ (WhiteSpace.rep *> NominalParametersP).?.map(_.getOrElse(Map.empty))).map {
+      case ((name, positionalParameters), nominalParameters) =>
+        ast.Expression.Function(name, positionalArguments = positionalParameters, namedArguments = nominalParameters)
+    }
 
+  lazy val HelperNameP: Parser[String] = Parser.until(Stop)
+
+  lazy val NominalParameterP: Parser[(String, ast.Expression)] =
+    (Parser.until(WhiteSpace | Equal) <* Equal
+      .surroundedBy(WhiteSpace.rep0)) ~ ParameterValueP
+
+  lazy val NominalParametersP: Parser0[Map[String, ast.Expression]] =
+    NominalParameterP.repSep0(WhiteSpace.rep).map { xs =>
+      xs.toList.toMap
+    }
+
+  lazy val StringLiteralP: Parser[ast.Expression.Value.String] =
+    (Quote *> Parser.until(Quote) <* Quote).map { value =>
+      ast.Expression.Value.String(value)
+    }
+
+  lazy val BooleanLiteralP: Parser[ast.Expression.Value.Boolean] =
+    (Parser.string("true").as(true) | Parser.string("false").as(false)).map { value =>
+      ast.Expression.Value.Boolean(value)
+    }
+
+  lazy val NumberLiteralP: Parser[ast.Expression.Value.Number] =
+    (Parser.charWhere(_.isDigit).repAs[String] ~ (Parser.char('.') *> Parser.charWhere(_.isDigit).repAs[String]).?)
+      .map { case (a, b) =>
+        ast.Expression.Value.Number(s"$a.${b.getOrElse("0")}".toDouble)
+      }
+
+  lazy val ValueLiteralP: Parser[ast.Expression.Value] = StringLiteralP | NumberLiteralP | BooleanLiteralP
+
+  lazy val ParameterValueP: Parser[ast.Expression] =
+    Parser.oneOf(
+      List(ValueLiteralP, (OpenParen ~ WhiteSpace.rep0) *> Parser.defer(HelperP) <* (WhiteSpace.rep0 ~ CloseParen))
+    )
+
+  lazy val PositionalParametersP: Parser0[List[ast.Expression]] = ParameterValueP.repSep0(WhiteSpace.rep0)
+
+  lazy val EscapedRefP: Parser[ast.Expression.Function] = HelperP
+    .between(StartExpr *> WhiteSpace.rep0, WhiteSpace.rep0 *> EndExpr)
+    .map(exp => ast.Expression.Function("render", List(ast.Expression.Function("escape", List(exp)))))
+
+  lazy val UnescapedRefP: Parser[ast.Expression.Function] = HelperP
+    .between(StartUnescapedExpr *> WhiteSpace.rep0, WhiteSpace.rep0 *> EndUnescapedExpr)
+    .map(exp => ast.Expression.Function("render", List(exp)))
+
+  // . -> valid = lookup(context '.')
+  // this -> valid = lookup(context '.')
+  // foo -> valid = lookup(context 'foo')
+  // [foo].[bar baz] -> lookup(lookup(lookup(context '.') 'foo'), 'bar baz')
+  // this.firstname -> lookup(lookup(context '.') 'firstname')
+  // ./firstname -> lookup(lookup(context '.') 'firstname')
+  // ../firstname -> lookup(lookup(context '..') 'firstname')
+  // .././firstname -> valid
+
+  // (StartExpr ~ (WhiteSpace.? *> HelperP <* WhiteSpace.?) ~ EndExpr).map { case ((eatSpaceLeft, f), eatSpaceRight) =>
+  //   f
+  // }
   // lazy val BlockName: Parser[String] = P(CharsWhile(c => c != '}' && c != ' ').!)
   // val BlockArguments: Parser[Seq[String]] = P(BlockName.rep(sep = (Space ~/ Pass).rep(min = 1)))
 

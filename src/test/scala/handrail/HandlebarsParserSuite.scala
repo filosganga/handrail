@@ -144,6 +144,375 @@ class HandlebarsParserSuite extends munit.FunSuite {
     assertEquals(clue(result), ast.Ref("foo", escaped = false, eatSpace = ast.EatSpace.Both).asRight[Parser.Error])
   }
 
+  test("StringLiteralP should parse a string") {
+    val source = """"foo bar""""
+    val result = StringLiteralP.parse(source)
+
+    assertEquals(clue(result), ("", ast.Expression.Value.String("foo bar")).asRight[Parser.Error])
+  }
+
+  test("BooleanLiteralP should parse true") {
+    val source = """true"""
+    val result = BooleanLiteralP.parse(source)
+
+    assertEquals(clue(result), ("", ast.Expression.Value.Boolean(true)).asRight[Parser.Error])
+  }
+
+  test("BooleanLiteralP should parse false") {
+    val source = """false"""
+    val result = BooleanLiteralP.parse(source)
+
+    assertEquals(clue(result), ("", ast.Expression.Value.Boolean(false)).asRight[Parser.Error])
+  }
+
+  test("NumberLiteralP should parse an int") {
+    val source = """5"""
+    val result = NumberLiteralP.parse(source)
+
+    assertEquals(clue(result), ("", ast.Expression.Value.Number(5)).asRight[Parser.Error])
+  }
+
+  test("NumberLiteralP should parse a decimal") {
+    val source = """5.2"""
+    val result = NumberLiteralP.parse(source)
+
+    assertEquals(clue(result), ("", ast.Expression.Value.Number(5.2)).asRight[Parser.Error])
+  }
+
+  test("ValueLiteralP should parse a string") {
+    val source = """"foo bar""""
+    val result = ValueLiteralP.parse(source)
+
+    assertEquals(clue(result), ("", ast.Expression.Value.String("foo bar")).asRight[Parser.Error])
+  }
+
+  test("ValueLiteralP should parse true") {
+    val source = """true"""
+    val result = ValueLiteralP.parse(source)
+
+    assertEquals(clue(result), ("", ast.Expression.Value.Boolean(true)).asRight[Parser.Error])
+  }
+
+  test("ValueLiteralP should parse false") {
+    val source = """false"""
+    val result = ValueLiteralP.parse(source)
+
+    assertEquals(clue(result), ("", ast.Expression.Value.Boolean(false)).asRight[Parser.Error])
+  }
+
+  test("ValueLiteralP should parse an int") {
+    val source = """5"""
+    val result = ValueLiteralP.parse(source)
+
+    assertEquals(clue(result), ("", ast.Expression.Value.Number(5)).asRight[Parser.Error])
+  }
+
+  test("ValueLiteralP should parse a decimal") {
+    val source = """5.2"""
+    val result = ValueLiteralP.parse(source)
+
+    assertEquals(clue(result), ("", ast.Expression.Value.Number(5.2)).asRight[Parser.Error])
+  }
+
+  test("NominalParameterP should parse an assignement with spaces") {
+    val source = """foo = "bar""""
+    val result = NominalParameterP.parse(source)
+
+    assertEquals(
+      clue(result),
+      ("", "foo" -> ast.Expression.Value.String("bar")).asRight[Parser.Error]
+    )
+  }
+
+  test("NominalParameterP should parse an assignement without spaces") {
+    val source = """foo=5"""
+    val result = NominalParameterP.parse(source)
+
+    assertEquals(
+      clue(result),
+      ("", "foo" -> ast.Expression.Value.Number(5)).asRight[Parser.Error]
+    )
+  }
+
+  test("NominalParametersP should parse a list of assignements") {
+    val source = """foo="bar" bar=true"""
+    val result = NominalParametersP.parse(source)
+
+    assertEquals(
+      clue(result),
+      ("", Map("foo" -> ast.Expression.Value.String("bar"), "bar" -> ast.Expression.Value.Boolean(true)))
+        .asRight[Parser.Error]
+    )
+  }
+
+  test("NominalParametersP should parse a list of assignements with spaces") {
+    val source = """foo = "bar"   bar =   true"""
+    val result = NominalParametersP.parse(source)
+
+    assertEquals(
+      clue(result),
+      ("", Map("foo" -> ast.Expression.Value.String("bar"), "bar" -> ast.Expression.Value.Boolean(true)))
+        .asRight[Parser.Error]
+    )
+  }
+
+  test("PositionalParametersP should parse a list of parameter value") {
+    val source = """"foo"   5 false"""
+    val result = PositionalParametersP.parse(source)
+
+    assertEquals(
+      clue(result),
+      (
+        "",
+        List(
+          ast.Expression.Value.String("foo"),
+          ast.Expression.Value.Number(5),
+          ast.Expression.Value.Boolean(false)
+        )
+      ).asRight[Parser.Error]
+    )
+  }
+
+  test("PositionalParametersP should parse an empty list of parameter value") {
+    val source = """ """
+    val result = PositionalParametersP.parse(source)
+
+    assertEquals(
+      clue(result),
+      (" ", List.empty[ast.Expression]).asRight[Parser.Error]
+    )
+  }
+
+  test("HelperP should parse an helper without any parameters") {
+    val source = """helper"""
+    val result = HelperP.parse(source)
+
+    val expectedResult = ast.Expression.Function(
+      "helper",
+      List.empty,
+      Map.empty
+    )
+    assertEquals(
+      clue(result),
+      ("", expectedResult).asRight[Parser.Error]
+    )
+  }
+
+  test("HelperP should parse an helper within {{ and }}") {
+    val source = """{{helper}}"""
+    val result = EscapedRefP.parse(source)
+
+    val expectedResult = ast.Expression.Function(
+      "render",
+      List(
+        ast.Expression.Function(
+          "escape",
+          List(
+            ast.Expression.Function(
+              "helper",
+              List.empty,
+              Map.empty
+            )
+          )
+        )
+      )
+    )
+    assertEquals(
+      clue(result),
+      ("", expectedResult).asRight[Parser.Error]
+    )
+  }
+
+  test("HelperP should parse an helper within {{ and }} with spaces") {
+    val source = """{{  helper }}"""
+    val result = EscapedRefP.parse(source)
+
+    val expectedResult = ast.Expression.Function(
+      "render",
+      List(
+        ast.Expression.Function(
+          "escape",
+          List(
+            ast.Expression.Function(
+              "helper",
+              List.empty,
+              Map.empty
+            )
+          )
+        )
+      )
+    )
+    assertEquals(
+      clue(result),
+      ("", expectedResult).asRight[Parser.Error]
+    )
+  }
+
+  test("HelperP should parse an helper within {{{ and }}}") {
+    val source = """{{{helper}}}"""
+    val result = UnescapedRefP.parse(source)
+
+    val expectedResult = ast.Expression.Function(
+      "render",
+      List(
+        ast.Expression.Function(
+          "helper",
+          List.empty,
+          Map.empty
+        )
+      )
+    )
+    assertEquals(
+      clue(result),
+      ("", expectedResult).asRight[Parser.Error]
+    )
+  }
+
+  test("HelperP should parse an helper with 1 positional argument") {
+    val source = """helper 5"""
+    val result = HelperP.parse(source)
+
+    val expectedResult = ast.Expression.Function(
+      "helper",
+      List(ast.Expression.Value.Number(5)),
+      Map.empty
+    )
+    assertEquals(
+      clue(result),
+      ("", expectedResult).asRight[Parser.Error]
+    )
+  }
+
+  test("HelperP should parse a simple helper") {
+    val source = """helper "foo" 5.6 argName1=true argName2=false"""
+    val result = HelperP.parse(source)
+
+    val expectedResult = ast.Expression.Function(
+      "helper",
+      List(
+        ast.Expression.Value.String("foo"),
+        ast.Expression.Value.Number(5.6)
+      ),
+      Map(
+        "argName1" -> ast.Expression.Value.Boolean(true),
+        "argName2" -> ast.Expression.Value.Boolean(false)
+      )
+    )
+    assertEquals(
+      clue(result),
+      ("", expectedResult).asRight[Parser.Error]
+    )
+  }
+
+  test("HelperP should parse an helper with 1 nested helper") {
+    val source = """helper (helper 5)"""
+    val result = HelperP.parse(source)
+
+    val expectedResult = ast.Expression.Function(
+      "helper",
+      List(
+        ast.Expression.Function(
+          "helper",
+          List(
+            ast.Expression.Value.Number(5)
+          )
+        )
+      ),
+      Map.empty
+    )
+    assertEquals(
+      clue(result),
+      ("", expectedResult).asRight[Parser.Error]
+    )
+  }
+
+  test("HelperP should parse an helper with 2 nested helper") {
+    val source = """helper (helper (helper 5))"""
+    val result = HelperP.parse(source)
+
+    val expectedResult = ast.Expression.Function(
+      "helper",
+      List(
+        ast.Expression.Function(
+          "helper",
+          List(
+            ast.Expression.Function(
+              "helper",
+              List(
+                ast.Expression.Value.Number(5)
+              )
+            )
+          )
+        )
+      ),
+      Map.empty
+    )
+    assertEquals(
+      clue(result),
+      ("", expectedResult).asRight[Parser.Error]
+    )
+  }
+
+  test("HelperP should parse an helper with 1 nested helper as nominal argument") {
+    val source = """helper 6 one=(helper 5)"""
+    val result = HelperP.parse(source)
+
+    val expectedResult = ast.Expression.Function(
+      "helper",
+      List(
+        ast.Expression.Value.Number(6)
+      ),
+      Map(
+        "one" -> ast.Expression.Function(
+          "helper",
+          List(
+            ast.Expression.Value.Number(5)
+          ),
+          Map.empty
+        )
+      )
+    )
+    assertEquals(
+      clue(result),
+      ("", expectedResult).asRight[Parser.Error]
+    )
+  }
+
+  test("HelperP should parse an helper with many nested helpers ") {
+    val source = """helper (helper (helper 5)) one=(helper 5)"""
+    val result = HelperP.parse(source)
+
+    val expectedResult = ast.Expression.Function(
+      "helper",
+      List(
+        ast.Expression.Function(
+          "helper",
+          List(
+            ast.Expression.Function(
+              "helper",
+              List(
+                ast.Expression.Value.Number(5)
+              )
+            )
+          )
+        )
+      ),
+      Map(
+        "one" -> ast.Expression.Function(
+          "helper",
+          List(
+            ast.Expression.Value.Number(5)
+          ),
+          Map.empty
+        )
+      )
+    )
+    assertEquals(
+      clue(result),
+      ("", expectedResult).asRight[Parser.Error]
+    )
+  }
+
   // test("Comment should parse an unescaped comment") {
   //   val source = "{{! foo bar }}"
   //   val result = Comment.parseAll(source)
