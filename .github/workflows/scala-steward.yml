@@ -22,5 +22,5 @@ jobs:
         uses: scala-steward-org/scala-steward-action@v2
         with:
           github-token: ${{ secrets.SCALA_STEWARD_GITHUB_TOKEN }}
-          github-repository: filosganga/handrails
+          github-repository: filosganga/handrail
           branches: main
