@@ -65,7 +65,6 @@ jobs:
       - run: sbt scalafmtCheckAll
       - run: sbt compile
       - run: sbt Test/compile
-      - run: sbt IntegrationTest/compile
       - name: Store targets
         uses: alehechka/upload-tartifact@v1
         with:
