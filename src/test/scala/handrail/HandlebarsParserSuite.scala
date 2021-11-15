@@ -676,7 +676,7 @@ class HandlebarsParserSuite extends munit.FunSuite {
           namedArguments = Map(
             "two" -> ast.Expression.Function(
               "hel per",
-              positionalArguments(
+              positionalArguments = List(
                 ast.Expression.Value.Number(5)
               )
             )
