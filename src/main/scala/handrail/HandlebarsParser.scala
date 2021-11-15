@@ -5,11 +5,17 @@ import cats.parse.{Parser0, Parser, Numbers}
 
 object HandlebarsParser {
 
+  private val thisFunction = ast.Expression.Function("this")
+  private val notAllowedChars = Set('!', '"', '#', '%', '&', '\'', '(', ')', '*', '+', ',', '.', '/', ';', '<', '=',
+    '>', '@', '[', '\\', ']', '^', '`', '{', '|', '}', '~')
+
   lazy val WhiteSpace: Parser[Unit] = Parser.charIn(' ', '\t', '\n', '\r').void
   lazy val OpenCurlyBrace: Parser[Unit] = Parser.char('{')
   lazy val CloseCurlyBrace: Parser[Unit] = Parser.char('}')
   lazy val OpenParen: Parser[Unit] = Parser.char('(')
   lazy val CloseParen: Parser[Unit] = Parser.char(')')
+  lazy val OpenSquareBrace: Parser[Unit] = Parser.char('[')
+  lazy val CloseSquareBrace: Parser[Unit] = Parser.char(']')
   lazy val Bang: Parser[Unit] = Parser.char('!')
   lazy val Sharp: Parser[Unit] = Parser.char('#')
   lazy val Slash: Parser[Unit] = Parser.char('/')
@@ -18,6 +24,9 @@ object HandlebarsParser {
   lazy val Equal: Parser[Unit] = Parser.char('=')
   lazy val Quote: Parser[Unit] = Parser.char('"')
   lazy val Stop = WhiteSpace | CloseParen | CloseCurlyBrace | Parser.end
+  lazy val This = Parser.string("this")
+  lazy val Dot = Parser.char('.')
+  lazy val DoubleDot = Dot.rep(2, 2)
 
   lazy val Identifier: Parser[String] =
     (Parser.charWhere(_.isLetter) ~ Parser.until(
@@ -30,18 +39,6 @@ object HandlebarsParser {
 
   lazy val Text: Parser[ast.Text] = Parser.until(OpenCurlyBrace).map(ast.Text)
 
-  /* {{ <- legal
-   * {{# <- legal
-   * {{! <- legal
-   * {{!-- <- legal
-   * {{~ <- legal
-   * {{{ <- legal
-   * {{~{ <- legal
-   * {{~# <- legal
-   * {{~! <- legal
-   * {{~!-- <- legal
-   */
-
   lazy val TwoOpenCurlyBraces: Parser[Unit] = (OpenCurlyBrace *> OpenCurlyBrace)
   lazy val TwoCloseCurlyBraces: Parser[Unit] = (CloseCurlyBrace *> CloseCurlyBrace)
   lazy val TwoHyphen: Parser[Unit] = (Hyphen *> Hyphen)
@@ -52,21 +49,10 @@ object HandlebarsParser {
   lazy val EndExpr: Parser0[ast.EatSpace] =
     (Tilde.? <* TwoCloseCurlyBraces).map(_.fold(ast.EatSpace.none)(_ => ast.EatSpace.right))
 
-  lazy val EscapedRef: Parser[ast.Ref] = (StartExpr ~ (WhiteSpace.? *> Identifier <* WhiteSpace.?) ~ EndExpr).map {
-    case ((eatSpaceLeft, name), eatSpaceRight) =>
-      ast.Ref(name, escaped = true, eatSpace = eatSpaceLeft.combine(eatSpaceRight))
-  }
-
   lazy val StartUnescapedExpr: Parser[ast.EatSpace] =
     (TwoOpenCurlyBraces *> Tilde.? <* OpenCurlyBrace).map(_.fold(ast.EatSpace.none)(_ => ast.EatSpace.left))
   lazy val EndUnescapedExpr: Parser[ast.EatSpace] =
     (CloseCurlyBrace *> Tilde.? <* TwoCloseCurlyBraces).map(_.fold(ast.EatSpace.none)(_ => ast.EatSpace.right))
-
-  lazy val UnescapedRef: Parser[ast.Ref] =
-    (StartUnescapedExpr ~ (WhiteSpace.? *> Identifier <* WhiteSpace.?) ~ EndUnescapedExpr).map {
-      case ((eatSpaceLeft, name), eatSpaceRight) =>
-        ast.Ref(name, escaped = false, eatSpace = eatSpaceLeft.combine(eatSpaceRight))
-    }
 
   lazy val StartUnescapedComment: Parser[ast.EatSpace] =
     ((OpenCurlyBrace *> OpenCurlyBrace *> Tilde.?).soft <* Bang).map(_.fold(ast.EatSpace.none)(_ => ast.EatSpace.left))
@@ -104,24 +90,66 @@ object HandlebarsParser {
   lazy val StartCloseBlock: Parser[ast.EatSpace] =
     (TwoCloseCurlyBraces *> Tilde.? <* Slash).map(_.fold(ast.EatSpace.none)(_ => ast.EatSpace.right))
 
-  lazy val HelperP: Parser[ast.Expression.Function] =
-    (HelperNameP ~ (WhiteSpace.rep *> PositionalParametersP).?.map(
-      _.getOrElse(List.empty)
-    ) ~ (WhiteSpace.rep *> NominalParametersP).?.map(_.getOrElse(Map.empty))).map {
-      case ((name, positionalParameters), nominalParameters) =>
-        ast.Expression.Function(name, positionalArguments = positionalParameters, namedArguments = nominalParameters)
+  val HelperP: Parser[ast.Expression.Function] = {
+
+    val HelperNameP: Parser[String] = Quote *> Parser.until(Quote) <* Quote | Parser.until(Stop)
+
+    lazy val ParameterValueP: Parser[ast.Expression] =
+      Parser.oneOf(
+        List(
+          ValueLiteralP,
+          Parser.defer(HelperP).between(OpenParen *> WhiteSpace.rep0, WhiteSpace.rep0 <* CloseParen)
+        )
+      )
+
+    lazy val PositionalParametersP: Parser0[List[ast.Expression]] =
+      ParameterValueP.repSep0(WhiteSpace.rep0).withContext("PositionalParametersP")
+
+    val NominalParameterP: Parser[(String, ast.Expression)] =
+      (Parser.until(WhiteSpace | Equal) <* Equal
+        .surroundedBy(WhiteSpace.rep0)) ~ ParameterValueP
+
+    val NominalParametersP: Parser0[Map[String, ast.Expression]] =
+      NominalParameterP
+        .repSep0(WhiteSpace.rep)
+        .map { xs =>
+          xs.toList.toMap
+        }
+        .withContext("NominalParametersP")
+
+    val onlyHelpeNamerP = HelperNameP.map { case helperName =>
+      ast.Expression.Function(helperName)
     }
 
-  lazy val HelperNameP: Parser[String] = Parser.until(Stop)
-
-  lazy val NominalParameterP: Parser[(String, ast.Expression)] =
-    (Parser.until(WhiteSpace | Equal) <* Equal
-      .surroundedBy(WhiteSpace.rep0)) ~ ParameterValueP
-
-  lazy val NominalParametersP: Parser0[Map[String, ast.Expression]] =
-    NominalParameterP.repSep0(WhiteSpace.rep).map { xs =>
-      xs.toList.toMap
+    val withNominalArgs = (HelperNameP ~ (WhiteSpace.rep *> NominalParametersP)).map { case (helperName, nominalArgs) =>
+      ast.Expression.Function(helperName, namedArguments = nominalArgs)
     }
+
+    val withPositionalArgs = (HelperNameP ~ (WhiteSpace.rep *> PositionalParametersP)).map {
+      case (helperName, positionalParameters) =>
+        ast.Expression.Function(helperName, positionalArguments = positionalParameters)
+    }
+
+    val withPositionalAndNominalArgs =
+      (HelperNameP ~ (WhiteSpace.rep *> PositionalParametersP) ~ (WhiteSpace.rep *> NominalParametersP)).map {
+        case ((helperName, positionalParameters), nominalParameters) =>
+          ast.Expression.Function(
+            helperName,
+            positionalArguments = positionalParameters,
+            namedArguments = nominalParameters
+          )
+      }
+
+    Parser.oneOf(
+      List(
+        withPositionalAndNominalArgs.backtrack,
+        withNominalArgs.backtrack,
+        withPositionalArgs.backtrack,
+        onlyHelpeNamerP.backtrack
+      )
+    )
+
+  }
 
   lazy val StringLiteralP: Parser[ast.Expression.Value.String] =
     (Quote *> Parser.until(Quote) <* Quote).map { value =>
@@ -141,13 +169,6 @@ object HandlebarsParser {
 
   lazy val ValueLiteralP: Parser[ast.Expression.Value] = StringLiteralP | NumberLiteralP | BooleanLiteralP
 
-  lazy val ParameterValueP: Parser[ast.Expression] =
-    Parser.oneOf(
-      List(ValueLiteralP, (OpenParen ~ WhiteSpace.rep0) *> Parser.defer(HelperP) <* (WhiteSpace.rep0 ~ CloseParen))
-    )
-
-  lazy val PositionalParametersP: Parser0[List[ast.Expression]] = ParameterValueP.repSep0(WhiteSpace.rep0)
-
   lazy val EscapedRefP: Parser[ast.Expression.Function] = HelperP
     .between(StartExpr *> WhiteSpace.rep0, WhiteSpace.rep0 *> EndExpr)
     .map(exp => ast.Expression.Function("render", List(ast.Expression.Function("escape", List(exp)))))
@@ -156,14 +177,62 @@ object HandlebarsParser {
     .between(StartUnescapedExpr *> WhiteSpace.rep0, WhiteSpace.rep0 *> EndUnescapedExpr)
     .map(exp => ast.Expression.Function("render", List(exp)))
 
-  // . -> valid = lookup(context '.')
-  // this -> valid = lookup(context '.')
-  // foo -> valid = lookup(context 'foo')
-  // [foo].[bar baz] -> lookup(lookup(lookup(context '.') 'foo'), 'bar baz')
-  // this.firstname -> lookup(lookup(context '.') 'firstname')
-  // ./firstname -> lookup(lookup(context '.') 'firstname')
-  // ../firstname -> lookup(lookup(context '..') 'firstname')
-  // .././firstname -> valid
+  lazy val RefP: Parser[ast.Expression] = {
+
+    val segmentP = Parser.until(CloseSquareBrace).between(OpenSquareBrace, CloseSquareBrace) | Parser.until(
+      Parser.charIn(notAllowedChars)
+    )
+
+    val segmentSeparatorP = Slash | Dot
+
+    def segments(parent: ast.Expression): Parser[ast.Expression] = {
+
+      val segmentIdP: Parser[(ast.Expression.Function, Parser[Unit])] =
+        (
+          Parser
+            .until(CloseSquareBrace)
+            .between(OpenSquareBrace, CloseSquareBrace) |
+            Parser.until(Parser.charIn(notAllowedChars))
+        ).map { segmentId =>
+          val exp = ast.Expression.Function("lookup", List(parent, ast.Expression.Value.String(segmentId)))
+          val nextSeparator = Slash | Dot
+          (exp, nextSeparator)
+        }
+
+      val dotOrTwoDots: Parser[(ast.Expression.Function, Parser[Unit])] =
+        Dot.as('.').repUntilAs[String](Slash).map { segmentId =>
+          val exp = ast.Expression.Function("lookup", List(parent, ast.Expression.Value.String(segmentId)))
+          val nextSeparator = Slash
+          (exp, nextSeparator)
+        }
+
+      (dotOrTwoDots | segmentIdP).flatMap { case (exp, separator) =>
+        ((separator *> Parser.defer(segments(exp))) | Parser.pure(exp))
+      }
+    }
+
+    val thisP = This.as(thisFunction)
+    val jsString = (Quote *> Parser.until(Quote) <* Quote).map { property =>
+      ast.Expression.Function("lookup", List(thisFunction, ast.Expression.Value.String(property)))
+    }
+
+    Parser.oneOf(
+      List(
+        jsString,
+        (This *> (segmentSeparatorP *> segments(thisFunction))).backtrack,
+        thisP,
+        segments(thisFunction)
+      )
+    )
+  }
+  // val segment = Parser.charWhere(c => !notAllowedChars.contains(c)).repAs[String]
+
+  // lazy val SegmentP: Parser[ast.Expression.Function] = Parser.recursive[ast.Expression.Function] { recurse =>
+  //   (Dot *> segment) ~ recurse
+  // }
+
+  // val thisP = This.as(thisFunction)
+  // val dotP = Dot.as(thisFunction)
 
   // (StartExpr ~ (WhiteSpace.? *> HelperP <* WhiteSpace.?) ~ EndExpr).map { case ((eatSpaceLeft, f), eatSpaceRight) =>
   //   f

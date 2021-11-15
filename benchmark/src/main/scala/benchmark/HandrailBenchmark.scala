@@ -18,15 +18,18 @@ object HandrailBenchmark {
     "render",
     List(
       ast.Expression.Function(
-        "lookup",
+        "escape",
         List(
-          data,
-          ast.Expression.Value.String(".")
-        ),
-        Map.empty
+          ast.Expression.Function(
+            "lookup",
+            List(
+              data,
+              ast.Expression.Value.String(".")
+            )
+          )
+        )
       )
-    ),
-    Map.empty
+    )
   )
 
   val handlebars = new Handlebars();
@@ -35,17 +38,17 @@ object HandrailBenchmark {
 
 class HandrailBenchmark {
 
-  // @Benchmark
-  // @BenchmarkMode(Array(Mode.Throughput))
-  // @OutputTimeUnit(TimeUnit.SECONDS)
-  // def handrail(): Unit = {
-  //   Handrail
-  //     .eval(
-  //       HandrailBenchmark.expression,
-  //       HandrailBenchmark.data,
-  //       HandrailBenchmark.registry
-  //     )
-  // }
+  @Benchmark
+  @BenchmarkMode(Array(Mode.Throughput))
+  @OutputTimeUnit(TimeUnit.SECONDS)
+  def handrail(): Unit = {
+    Handrail
+      .eval(
+        HandrailBenchmark.expression,
+        HandrailBenchmark.data,
+        HandrailBenchmark.registry
+      )
+  }
 
   @Benchmark
   @BenchmarkMode(Array(Mode.Throughput))

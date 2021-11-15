@@ -116,6 +116,13 @@ object Helper {
     }
   }
 
+  val `this`: Helper = (
+      positionalArgs: List[Expression],
+      nominalArgs: Map[String, Expression],
+      data: Expression.Value,
+      eval: (Expression, Expression.Value) => Expression.Value
+  ) => data
+
   // {{#if foo.bar baz=qux}}foo{{else}}bar{{/if}} => render(if(posArgs = List(lookup(context, "foo.bar")), namedArgs = Map("baz", lookup(context, "qux")))
   val `if`: Helper = (
       positionalArgs: List[Expression],
@@ -193,6 +200,7 @@ case class HelpersRegistry(helpers: Map[String, Helper]) {
 object HelpersRegistry {
   val empty = HelpersRegistry(Map.empty)
   val default = empty
+    .withHelper("this", Helper.lookup)
     .withHelper("lookup", Helper.lookup)
     .withHelper("render", Helper.render)
     .withHelper("escape", Helper.escape)

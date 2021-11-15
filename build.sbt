@@ -58,3 +58,14 @@ lazy val benchmark = (project in file("benchmark"))
       "com.github.jknack" % "handlebars" % "4.3.0"
     )
   )
+
+lazy val docs = project
+  .enablePlugins(MdocPlugin, DocusaurusPlugin)
+  .in(file("handrail-docs"))
+  .dependsOn(handrail)
+  .settings(
+    moduleName := "handrail-docs",
+    mdocVariables := Map(
+      "VERSION" -> version.value
+    )
+  )
