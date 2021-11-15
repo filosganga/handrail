@@ -803,7 +803,7 @@ class HandlebarsParserSuite extends munit.FunSuite {
   }
 
   test("HelperP should parse an helper with many nested quoted helpers with args") {
-    val source = """"hel  per" (helper("hel per" 5 one=1)) one=("hel per" 5 two=2)"""
+    val source = """"hel per" (helper ("hel per" 5 one=1) ) one=("hel per" 5 two=2)"""
     val result = HelperP.parse(source)
 
     val expectedResult = ast.Expression.Function(
