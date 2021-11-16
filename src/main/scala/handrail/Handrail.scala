@@ -24,30 +24,42 @@ import cats.Applicative
  */
 object Handrail {
 
+  def parse(source: String): Either[Throwable, Expression] = {
+    HandlebarsParser.TemplateP
+      .parseAll(source)
+      .leftMap(e => new RuntimeException(e.toString))
+  }
+
   def eval(
       expression: Expression,
       data: Expression.Value,
       helpersRegistry: HelpersRegistry
   ): Expression.Value = {
-    expression match {
+
+    def eval(expression: Expression, data: Expression.Value): Expression.Value = expression match {
       case value: Expression.Value => value
       case Expression.Function(name, posArgs, namedArgs) =>
-        val helper = helpersRegistry.helpers
-          // TODO Use missing helper
-          .getOrElse(
-            name,
-            throw new RuntimeException(
-              show"Helper with name ${name} does not exist in the HelperRegistry ${helpersRegistry}"
+        helpersRegistry.helpers
+          .get(name)
+          .map { helper =>
+            helper(
+              positionalArgs = posArgs,
+              nominalArgs = namedArgs,
+              data = data,
+              eval = eval _
             )
-          )
-
-        helper(
-          positionalArgs = posArgs,
-          nominalArgs = namedArgs,
-          data = data,
-          eval = (exp, data) => eval(exp, data, helpersRegistry)
-        )
+          }
+          .getOrElse {
+            if (posArgs.isEmpty && namedArgs.isEmpty) {
+              Helper.Lookup(List(data, ast.Expression.Value.String(name)), Map.empty, data, eval _)
+            } else {
+              // TODO Use missing helper
+              ast.Expression.Value.Void
+            }
+          }
     }
+
+    eval(expression, data)
   }
 
 }

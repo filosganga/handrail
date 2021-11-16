@@ -12,28 +12,15 @@ import org.typelevel.log4cats.slf4j.Slf4jLogger
 import com.github.jknack.handlebars._
 
 object HandrailBenchmark {
-  val registry = HelpersRegistry.default
+  val source = "Hello {{.}}!"
+
+  val handrailHelpersRegistry = HelpersRegistry.default
   val data = ast.Expression.Value.String("foo")
-  val expression = ast.Expression.Function(
-    "render",
-    List(
-      ast.Expression.Function(
-        "escape",
-        List(
-          ast.Expression.Function(
-            "lookup",
-            List(
-              data,
-              ast.Expression.Value.String(".")
-            )
-          )
-        )
-      )
-    )
-  )
+
+  val handrailTemplate = Handrail.parse(source).getOrElse(throw new RuntimeException)
 
   val handlebars = new Handlebars();
-  val template = handlebars.compileInline("{{.}}!");
+  val handlebarsTemplate = handlebars.compileInline(source);
 }
 
 class HandrailBenchmark {
@@ -44,17 +31,24 @@ class HandrailBenchmark {
   def handrail(): Unit = {
     Handrail
       .eval(
-        HandrailBenchmark.expression,
+        HandrailBenchmark.handrailTemplate,
         HandrailBenchmark.data,
-        HandrailBenchmark.registry
+        HandrailBenchmark.handrailHelpersRegistry
       )
   }
 
-  @Benchmark
-  @BenchmarkMode(Array(Mode.Throughput))
-  @OutputTimeUnit(TimeUnit.SECONDS)
-  def handlebars(): Unit = {
-    HandrailBenchmark
-      .template("foo")
-  }
+  // @Benchmark
+  // @BenchmarkMode(Array(Mode.Throughput))
+  // @OutputTimeUnit(TimeUnit.SECONDS)
+  // def handrailParse(): Unit = {
+  //   Handrail.parse(HandrailBenchmark.source).getOrElse(throw new RuntimeException)
+  // }
+
+//   @Benchmark
+//   @BenchmarkMode(Array(Mode.Throughput))
+//   @OutputTimeUnit(TimeUnit.SECONDS)
+//   def handlebars(): Unit = {
+//     HandrailBenchmark
+//       .handlebarsTemplate("foo")
+//   }
 }

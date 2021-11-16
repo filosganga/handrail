@@ -978,6 +978,162 @@ class HandlebarsParserSuite extends munit.FunSuite {
     assertEquals(result, ("", expectedResult).asRight[Parser.Error], s"Cannot parse '$source'")
   }
 
+  test("TemplateP should parse a text") {
+    val source = """luna"""
+    val result = TemplateP.parse(source)
+
+    val expectedResult =
+      ast.Expression.Function(
+        "template",
+        List(
+          ast.Expression.Value.Array(
+            List(
+              ast.Expression.Function(
+                "render",
+                List(
+                  ast.Expression.Value.String("luna")
+                )
+              )
+            )
+          )
+        )
+      )
+
+    assertEquals(result, ("", expectedResult).asRight[Parser.Error], s"Cannot parse '$source'")
+  }
+
+  test("TemplateP should parse a Ref") {
+    val source = """{{ luna }}"""
+    val result = TemplateP.parse(source)
+
+    val expectedResult =
+      ast.Expression.Function(
+        "template",
+        List(
+          ast.Expression.Value.Array(
+            List(
+              ast.Expression.Function(
+                "render",
+                List(
+                  ast.Expression.Function(
+                    "escape",
+                    List(
+                      ast.Expression.Function(
+                        "luna",
+                        List.empty,
+                        Map.empty
+                      )
+                    )
+                  )
+                )
+              )
+            )
+          )
+        )
+      )
+
+    assertEquals(result, ("", expectedResult).asRight[Parser.Error], s"Cannot parse '$source'")
+  }
+
+  test("TemplateP should parse Refs and texts") {
+    val source = """{{ lilo }} and {{{stitch}}}"""
+    val result = TemplateP.parse(source)
+
+    val expectedResult =
+      ast.Expression.Function(
+        "template",
+        List(
+          ast.Expression.Value.Array(
+            List(
+              ast.Expression.Function(
+                "render",
+                List(
+                  ast.Expression.Function(
+                    "escape",
+                    List(
+                      ast.Expression.Function(
+                        "lilo",
+                        List.empty,
+                        Map.empty
+                      )
+                    )
+                  )
+                )
+              ),
+              ast.Expression.Function(
+                "render",
+                List(
+                  ast.Expression.Value.String(" and ")
+                )
+              ),
+              ast.Expression.Function(
+                "render",
+                List(
+                  ast.Expression.Function(
+                    "stitch",
+                    List.empty,
+                    Map.empty
+                  )
+                )
+              )
+            )
+          )
+        )
+      )
+
+    assertEquals(result, ("", expectedResult).asRight[Parser.Error], s"Cannot parse '$source'")
+  }
+
+  test("TemplateP should parse Refs and texts and comments") {
+    val source = """{{ lilo }} and {{! ignore me}}{{{stitch}}}"""
+    val result = TemplateP.parse(source)
+
+    val expectedResult =
+      ast.Expression.Function(
+        "template",
+        List(
+          ast.Expression.Value.Array(
+            List(
+              ast.Expression.Function(
+                "render",
+                List(
+                  ast.Expression.Function(
+                    "escape",
+                    List(
+                      ast.Expression.Function(
+                        "lilo",
+                        List.empty,
+                        Map.empty
+                      )
+                    )
+                  )
+                )
+              ),
+              ast.Expression.Function(
+                "render",
+                List(
+                  ast.Expression.Value.String(" and ")
+                )
+              ),
+              ast.Expression.Value.Void,
+              ast.Expression.Function(
+                "render",
+                List(
+                  ast.Expression.Function(
+                    "stitch",
+                    List.empty,
+                    Map.empty
+                  )
+                )
+              )
+            )
+          )
+        )
+      )
+
+    assertEquals(result, ("", expectedResult).asRight[Parser.Error], s"Cannot parse '$source'")
+  }
+
   // test("Comment should parse an unescaped comment") {
   //   val source = "{{! foo bar }}"
   //   val result = Comment.parseAll(source)

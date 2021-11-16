@@ -56,9 +56,11 @@ object ast {
   object Expression {
     sealed trait Value extends Expression
     object Value {
+      // TODO Add safestring
       case class String(value: scala.Predef.String) extends Value
       case class Number(value: scala.Double) extends Value
       case class Boolean(value: scala.Boolean) extends Value
+      case class Array(values: Iterable[Expression]) extends Value
       case class Object(value: Map[scala.Predef.String, Expression.Value]) extends Value
       case object Void extends Value
     }

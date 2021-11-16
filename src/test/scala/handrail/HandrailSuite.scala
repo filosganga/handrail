@@ -8,11 +8,6 @@ class HandrailSuite extends munit.CatsEffectSuite {
 
   val stringBuilderR = ResourceFixture(Resource.make(IO(new StringBuilder))(sb => IO(sb.clear)))
 
-  /*
-   * template: {{.}}
-   * context: "foo"
-   * result: "foo"
-   */
   test("it should render itself") {
     val data = ast.Expression.Value.String("foo")
     val expression = ast.Expression.Function(
@@ -234,5 +229,59 @@ class HandrailSuite extends munit.CatsEffectSuite {
       )
 
     assertEquals(result, ast.Expression.Value.String("bar"))
+  }
+
+  test("template should concatenate expressions values") {
+    val data = ast.Expression.Value.Object(Map.empty)
+    val expression = ast.Expression.Function(
+      "template",
+      List(
+        ast.Expression.Value.Array(
+          List(
+            ast.Expression.Function(
+              "render",
+              List(
+                ast.Expression.Value.String("foo")
+              ),
+              Map.empty
+            ),
+            ast.Expression.Function(
+              "render",
+              List(
+                ast.Expression.Value.String("bar")
+              ),
+              Map.empty
+            )
+          )
+        )
+      ),
+      Map.empty
+    )
+
+    val result = Handrail
+      .eval(
+        expression,
+        data,
+        HelpersRegistry.default
+      )
+
+    assertEquals(result, ast.Expression.Value.String("foobar"))
+  }
+
+  test("Handrail should compile and fill a simple template") {
+    val data = ast.Expression.Value.Object(Map("name" -> ast.Expression.Value.String("John")))
+
+    val source = """Hello, {{name}}"""
+
+    val template = HandlebarsParser.TemplateP.parseAll(source).getOrElse(throw new RuntimeException)
+
+    val result = Handrail
+      .eval(
+        template,
+        data,
+        HelpersRegistry.default
+      )
+
+    assertEquals(result, ast.Expression.Value.String("Hello, John"))
   }
 }

@@ -65,25 +65,14 @@ object HandlebarsParser {
     ((TwoHyphen *> OpenCurlyBrace *> OpenCurlyBrace *> Tilde.?).soft <* Bang)
       .map(_.fold(ast.EatSpace.none)(_ => ast.EatSpace.left))
 
-  lazy val UnescapedComment: Parser[ast.Comment] =
-    (StartUnescapedComment ~ (WhiteSpace.? *> Parser.until(WhiteSpace.? *> EndExpr) <* WhiteSpace.?) ~ EndExpr).map {
-      case ((eatSpaceLeft, commentContent), eatSpaceRight) =>
-        ast.Comment(
-          commentContent,
-          escaped = false,
-          eatSpace = eatSpaceLeft.combine(eatSpaceRight)
-        )
-    }
+  lazy val UnescapedComment: Parser[ast.Expression] =
+    (StartUnescapedComment ~ (WhiteSpace.? *> Parser.until(WhiteSpace.? *> EndExpr) <* WhiteSpace.?) ~ EndExpr)
+      .as(ast.Expression.Value.Void)
 
-  lazy val EscapedComment: Parser[ast.Comment] =
-    (StartEscapedComment ~ (WhiteSpace.? *> Parser.until(WhiteSpace.? *> EndEscapedComment) <* WhiteSpace.?) ~ EndExpr)
-      .map { case ((eatSpaceLeft, commentContent), eatSpaceRight) =>
-        ast.Comment(
-          commentContent,
-          escaped = true,
-          eatSpace = eatSpaceLeft.combine(eatSpaceRight)
-        )
-      }
+  lazy val EscapedComment: Parser[ast.Expression] =
+    (StartEscapedComment ~ (WhiteSpace.? *> Parser.until(
+      WhiteSpace.? *> EndEscapedComment
+    ) <* WhiteSpace.?) ~ EndExpr).as(ast.Expression.Value.Void)
 
   lazy val StartOpenBlock: Parser[ast.EatSpace] =
     ((TwoOpenCurlyBraces *> Tilde.?).soft <* Sharp).map(_.fold(ast.EatSpace.none)(_ => ast.EatSpace.left))
@@ -149,33 +138,31 @@ object HandlebarsParser {
       )
     )
 
-  }
+  }.withContext("HelperP")
 
   lazy val StringLiteralP: Parser[ast.Expression.Value.String] =
-    (Quote *> Parser.until(Quote) <* Quote).map { value =>
-      ast.Expression.Value.String(value)
-    }
+    (Quote *> Parser.until(Quote) <* Quote)
+      .map { value =>
+        ast.Expression.Value.String(value)
+      }
+      .withContext("StringLiteralP")
 
   lazy val BooleanLiteralP: Parser[ast.Expression.Value.Boolean] =
-    (Parser.string("true").as(true) | Parser.string("false").as(false)).map { value =>
-      ast.Expression.Value.Boolean(value)
-    }
+    (Parser.string("true").as(true) | Parser.string("false").as(false))
+      .map { value =>
+        ast.Expression.Value.Boolean(value)
+      }
+      .withContext("BooleanLiteralP")
 
   lazy val NumberLiteralP: Parser[ast.Expression.Value.Number] =
     (Parser.charWhere(_.isDigit).repAs[String] ~ (Parser.char('.') *> Parser.charWhere(_.isDigit).repAs[String]).?)
       .map { case (a, b) =>
         ast.Expression.Value.Number(s"$a.${b.getOrElse("0")}".toDouble)
       }
+      .withContext("NumberLiteralP")
 
-  lazy val ValueLiteralP: Parser[ast.Expression.Value] = StringLiteralP | NumberLiteralP | BooleanLiteralP
-
-  lazy val EscapedRefP: Parser[ast.Expression.Function] = HelperP
-    .between(StartExpr *> WhiteSpace.rep0, WhiteSpace.rep0 *> EndExpr)
-    .map(exp => ast.Expression.Function("render", List(ast.Expression.Function("escape", List(exp)))))
-
-  lazy val UnescapedRefP: Parser[ast.Expression.Function] = HelperP
-    .between(StartUnescapedExpr *> WhiteSpace.rep0, WhiteSpace.rep0 *> EndUnescapedExpr)
-    .map(exp => ast.Expression.Function("render", List(exp)))
+  lazy val ValueLiteralP: Parser[ast.Expression.Value] =
+    (StringLiteralP | NumberLiteralP | BooleanLiteralP).withContext("ValueLiteralP")
 
   lazy val RefP: Parser[ast.Expression] = {
 
@@ -224,19 +211,41 @@ object HandlebarsParser {
         segments(thisFunction)
       )
     )
-  }
-  // val segment = Parser.charWhere(c => !notAllowedChars.contains(c)).repAs[String]
+  }.withContext("RefP")
 
-  // lazy val SegmentP: Parser[ast.Expression.Function] = Parser.recursive[ast.Expression.Function] { recurse =>
-  //   (Dot *> segment) ~ recurse
-  // }
+  lazy val EscapedRefP: Parser[ast.Expression.Function] = HelperP
+    .between(StartExpr *> WhiteSpace.rep0, WhiteSpace.rep0 *> EndExpr)
+    .map(exp => ast.Expression.Function("render", List(ast.Expression.Function("escape", List(exp)))))
+    .withContext("EscapedRefP")
 
-  // val thisP = This.as(thisFunction)
-  // val dotP = Dot.as(thisFunction)
+  lazy val UnescapedRefP: Parser[ast.Expression.Function] = HelperP
+    .between(StartUnescapedExpr *> WhiteSpace.rep0, WhiteSpace.rep0 *> EndUnescapedExpr)
+    .map(exp => ast.Expression.Function("render", List(exp)))
+    .withContext("UnescapedRefP")
 
-  // (StartExpr ~ (WhiteSpace.? *> HelperP <* WhiteSpace.?) ~ EndExpr).map { case ((eatSpaceLeft, f), eatSpaceRight) =>
-  //   f
-  // }
+  lazy val TextP: Parser[ast.Expression] = Parser
+    .until(OpenCurlyBrace *> OpenCurlyBrace | Parser.end)
+    .map { text =>
+      ast.Expression.Function("render", List(ast.Expression.Value.String(text)))
+    }
+    .withContext("Text")
+
+  lazy val TemplateP: Parser0[ast.Expression] =
+    (Parser.start *> Parser
+      .oneOf(
+        List(
+          UnescapedComment.backtrack,
+          EscapedComment.backtrack,
+          UnescapedRefP.backtrack,
+          EscapedRefP.backtrack,
+          TextP.backtrack
+        )
+      )
+      .rep0
+      .map { exps =>
+        ast.Expression.Function("template", List(ast.Expression.Value.Array(exps)))
+      } <* Parser.end).withContext("Template")
+
   // lazy val BlockName: Parser[String] = P(CharsWhile(c => c != '}' && c != ' ').!)
   // val BlockArguments: Parser[Seq[String]] = P(BlockName.rep(sep = (Space ~/ Pass).rep(min = 1)))
 
