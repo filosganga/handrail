@@ -1,11 +1,6 @@
 name: main
 
-on:
-  push:
-    branches:
-      - main
-
-concurrency: ci-${{ github.ref }}
+on: pull_request
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -143,20 +138,3 @@ jobs:
           name: unit tests
           path: target/test-reports/*.xml
           reporter: java-junit
-
-  tag:
-    runs-on: ubuntu-latest
-    needs:
-      - unit_test
-      - generate-doc
-    outputs:
-      new_tag: ${{ steps.tag.outputs.new_tag }}
-    steps:
-      - uses: actions/checkout@v2
-      - name: Bump version and push tag
-        id: tag
-        uses: anothrNick/github-tag-action@1.36.0
-        env:
-          DEFAULT_BUMP: patch
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          WITH_V: true
