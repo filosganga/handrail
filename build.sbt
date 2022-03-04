@@ -8,7 +8,7 @@ val munitCatsEffectV = "1.0.6"
 val scalacheckEffectV = "1.0.3"
 val log4j2V = "2.14.1"
 val log4catsV = "2.1.1"
-val fs2V = "3.2.2"
+val fs2V = "3.2.5"
 val apacheCommonsTextV = "1.9"
 
 Global / onChangedBuildSource := ReloadOnSourceChanges
