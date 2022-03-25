@@ -28,7 +28,7 @@ class HandrailBenchmark {
   @Benchmark
   @BenchmarkMode(Array(Mode.Throughput))
   @OutputTimeUnit(TimeUnit.SECONDS)
-  def handrail(): Unit = {
+  def handrailEval(): Unit = {
     Handrail
       .eval(
         HandrailBenchmark.handrailTemplate,
@@ -37,18 +37,25 @@ class HandrailBenchmark {
       )
   }
 
-  // @Benchmark
-  // @BenchmarkMode(Array(Mode.Throughput))
-  // @OutputTimeUnit(TimeUnit.SECONDS)
-  // def handrailParse(): Unit = {
-  //   Handrail.parse(HandrailBenchmark.source).getOrElse(throw new RuntimeException)
-  // }
+  @Benchmark
+  @BenchmarkMode(Array(Mode.Throughput))
+  @OutputTimeUnit(TimeUnit.SECONDS)
+  def handlebarsEval(): Unit = {
+    HandrailBenchmark
+      .handlebarsTemplate("foo")
+  }
 
-//   @Benchmark
-//   @BenchmarkMode(Array(Mode.Throughput))
-//   @OutputTimeUnit(TimeUnit.SECONDS)
-//   def handlebars(): Unit = {
-//     HandrailBenchmark
-//       .handlebarsTemplate("foo")
-//   }
+  @Benchmark
+  @BenchmarkMode(Array(Mode.Throughput))
+  @OutputTimeUnit(TimeUnit.SECONDS)
+  def handrailParse(): Unit = {
+    Handrail.parse(HandrailBenchmark.source).getOrElse(throw new RuntimeException)
+  }
+
+  @Benchmark
+  @BenchmarkMode(Array(Mode.Throughput))
+  @OutputTimeUnit(TimeUnit.SECONDS)
+  def handlebarsParse(): Unit = {
+    HandrailBenchmark.handlebars.compileInline(HandrailBenchmark.source);
+  }
 }

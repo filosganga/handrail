@@ -1,6 +1,6 @@
 # Handrail
 
-Scala effectuful handlebars.js compatible template engine
+Scala effectful handlebars.js compatible template engine
 
 ## TODO
 

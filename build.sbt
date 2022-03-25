@@ -1,19 +1,19 @@
-val catsV = "2.6.1"
-val catsEffectV = "3.2.9"
-val catsParseV = "0.3.5"
+val catsV = "2.7.0"
+val catsEffectV = "3.3.8"
+val catsParseV = "0.3.6"
 val enumeratumV = "1.7.0"
 val caseInsensitiveV = "1.2.0"
 val munitV = "0.7.29"
-val munitCatsEffectV = "1.0.6"
+val munitCatsEffectV = "1.0.7"
 val scalacheckEffectV = "1.0.3"
-val log4j2V = "2.14.1"
-val log4catsV = "2.1.1"
-val fs2V = "3.2.2"
+val log4j2V = "2.17.2"
+val log4catsV = "2.2.0"
+val fs2V = "3.2.5"
 val apacheCommonsTextV = "1.9"
 
 Global / onChangedBuildSource := ReloadOnSourceChanges
 
-ThisBuild / scalaVersion := "2.13.7"
+ThisBuild / scalaVersion := "2.13.8"
 ThisBuild / organizationName := "Filippo De Luca"
 ThisBuild / dynverSeparator := "-"
 ThisBuild / evictionErrorLevel := Level.Warn
