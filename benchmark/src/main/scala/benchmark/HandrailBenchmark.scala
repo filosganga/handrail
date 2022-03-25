@@ -15,9 +15,9 @@ object HandrailBenchmark {
   val source = "Hello {{.}}!"
 
   val handrailHelpersRegistry = HelpersRegistry.default
-  val data = ast.Expression.Value.String("foo")
+  val data = model.Expression.Value.String("foo")
 
-  val handrailTemplate = Handrail.parse(source).getOrElse(throw new RuntimeException)
+  val handrailTemplate = Handrail.parse(source, handrail.HelpersRegistry.default).getOrElse(throw new RuntimeException)
 
   val handlebars = new Handlebars();
   val handlebarsTemplate = handlebars.compileInline(source);
@@ -29,33 +29,28 @@ class HandrailBenchmark {
   @BenchmarkMode(Array(Mode.Throughput))
   @OutputTimeUnit(TimeUnit.SECONDS)
   def handrailEval(): Unit = {
-    Handrail
-      .eval(
-        HandrailBenchmark.handrailTemplate,
-        HandrailBenchmark.data,
-        HandrailBenchmark.handrailHelpersRegistry
-      )
+    HandrailBenchmark.handrailTemplate(HandrailBenchmark.data)
   }
 
-  @Benchmark
-  @BenchmarkMode(Array(Mode.Throughput))
-  @OutputTimeUnit(TimeUnit.SECONDS)
-  def handlebarsEval(): Unit = {
-    HandrailBenchmark
-      .handlebarsTemplate("foo")
-  }
+  // @Benchmark
+  // @BenchmarkMode(Array(Mode.Throughput))
+  // @OutputTimeUnit(TimeUnit.SECONDS)
+  // def handlebarsEval(): Unit = {
+  //   HandrailBenchmark
+  //     .handlebarsTemplate("foo")
+  // }
 
-  @Benchmark
-  @BenchmarkMode(Array(Mode.Throughput))
-  @OutputTimeUnit(TimeUnit.SECONDS)
-  def handrailParse(): Unit = {
-    Handrail.parse(HandrailBenchmark.source).getOrElse(throw new RuntimeException)
-  }
+  // @Benchmark
+  // @BenchmarkMode(Array(Mode.Throughput))
+  // @OutputTimeUnit(TimeUnit.SECONDS)
+  // def handrailParse(): Unit = {
+  //   Handrail.parse(HandrailBenchmark.source, handrail.HelpersRegistry.default).getOrElse(throw new RuntimeException)
+  // }
 
-  @Benchmark
-  @BenchmarkMode(Array(Mode.Throughput))
-  @OutputTimeUnit(TimeUnit.SECONDS)
-  def handlebarsParse(): Unit = {
-    HandrailBenchmark.handlebars.compileInline(HandrailBenchmark.source);
-  }
+  // @Benchmark
+  // @BenchmarkMode(Array(Mode.Throughput))
+  // @OutputTimeUnit(TimeUnit.SECONDS)
+  // def handlebarsParse(): Unit = {
+  //   HandrailBenchmark.handlebars.compileInline(HandrailBenchmark.source);
+  // }
 }

@@ -4,284 +4,270 @@ import cats.syntax.all._
 import cats.parse._
 import cats.effect._
 
+import handrail.model._
+
 class HandrailSuite extends munit.CatsEffectSuite {
 
   val stringBuilderR = ResourceFixture(Resource.make(IO(new StringBuilder))(sb => IO(sb.clear)))
 
-  test("it should render itself") {
-    val data = ast.Expression.Value.String("foo")
-    val expression = ast.Expression.Function(
-      "render",
-      List(
-        ast.Expression.Function(
-          "lookup",
-          List(
-            data,
-            ast.Expression.Value.String(".")
-          ),
-          Map.empty
-        )
-      ),
-      Map.empty
-    )
+  test("it should render {{this}}") {
+    val result =
+      Handrail.parse("{{this}}", HelpersRegistry.default).flatMap { template =>
+        template(Expression.Value.String("foo")).leftWiden[HandrailError]
+      }
 
-    val result = Handrail
-      .eval(
-        expression,
-        data,
-        HelpersRegistry.default
-      )
-
-    assertEquals(result, ast.Expression.Value.String("foo"))
+    assertEquals(result, "foo".asRight[HandrailError])
   }
 
-  test("it should render a property") {
-    val data = ast.Expression.Value.Object(Map("foo" -> ast.Expression.Value.String("bar")))
-    val expression = ast.Expression.Function(
-      "render",
-      List(
-        ast.Expression.Function(
-          "lookup",
-          List(
-            data,
-            ast.Expression.Value.String("foo")
-          ),
-          Map.empty
-        )
-      ),
-      Map.empty
-    )
+  test("it should render {{.}}") {
+    val result =
+      Handrail.parse("{{.}}", HelpersRegistry.default).flatMap { template =>
+        template(Expression.Value.String("foo")).leftWiden[HandrailError]
+      }
 
-    val result = Handrail
-      .eval(
-        expression,
-        data,
-        HelpersRegistry.default
-      )
-
-    assertEquals(result, ast.Expression.Value.String("bar"))
+    assertEquals(result, "foo".asRight[HandrailError])
   }
 
-  test("it should escape HTML") {
-    val data = ast.Expression.Value.Object(Map("foo" -> ast.Expression.Value.String("perché")))
-    val expression = ast.Expression.Function(
-      "render",
-      List(
-        ast.Expression.Function(
-          "escape",
-          List(
-            ast.Expression.Function(
-              "lookup",
-              List(
-                data,
-                ast.Expression.Value.String("foo")
-              ),
-              Map.empty
-            )
-          ),
-          Map.empty
-        )
-      ),
-      Map.empty
-    )
+  test("it should render {{foo}}") {
+    val result =
+      Handrail.parse("{{foo}}", HelpersRegistry.default).flatMap { template =>
+        template(Expression.Value.Object(Map("foo" -> Expression.Value.String("bar")))).leftWiden[HandrailError]
+      }
 
-    val result = Handrail
-      .eval(
-        expression,
-        data,
-        HelpersRegistry.default
-      )
-
-    assertEquals(result, ast.Expression.Value.String("perch&eacute;"))
+    assertEquals(result, "bar".asRight[HandrailError])
   }
 
-  test("{{#if}} should evaluate body when true") {
-    val data = ast.Expression.Value.Object(Map("foo" -> ast.Expression.Value.String("perché")))
-    val expression = ast.Expression.Function(
-      "render",
-      List(
-        ast.Expression.Function(
-          "if",
-          List(
-            ast.Expression.Value.Boolean(true)
-          ),
-          Map(
-            "body" -> ast.Expression.Function(
-              "render",
-              List(ast.Expression.Value.String("foo"))
-            )
-          )
-        )
-      ),
-      Map.empty
-    )
+  test("it should render {{foo.bar}}") {
+    val result =
+      Handrail.parse("{{foo.bar}}", HelpersRegistry.default).flatMap { template =>
+        template(
+          Expression.Value.Object(Map("foo" -> Expression.Value.Object(Map("bar" -> Expression.Value.String("baz")))))
+        ).leftWiden[HandrailError]
+      }
 
-    val result = Handrail
-      .eval(
-        expression,
-        data,
-        HelpersRegistry.default
-      )
-
-    assertEquals(result, ast.Expression.Value.String("foo"))
+    assertEquals(result, "baz".asRight[HandrailError])
   }
 
-  stringBuilderR.test("{{#if}} should evaluate else when false") { sb =>
-    val data = ast.Expression.Value.Object(Map("foo" -> ast.Expression.Value.String("perché")))
-    val expression = ast.Expression.Function(
-      "render",
-      List(
-        ast.Expression.Function(
-          "if",
-          List(
-            ast.Expression.Value.Boolean(false)
-          ),
-          Map(
-            "body" -> ast.Expression.Function(
-              "render",
-              List(ast.Expression.Value.String("foo"))
-            ),
-            "else" -> ast.Expression.Function(
-              "render",
-              List(ast.Expression.Value.String("bar"))
-            )
-          )
-        )
-      ),
-      Map.empty
-    )
+//   test("it should escape HTML") {
+//     val data = model.Expression.Value.Object(Map("foo" -> model.Expression.Value.String("perché")))
+//     val expression = model.Expression.Function(
+//       "render",
+//       List(
+//         model.Expression.Function(
+//           "escape",
+//           List(
+//             model.Expression.Function(
+//               "lookup",
+//               List(
+//                 data,
+//                 model.Expression.Value.String("foo")
+//               ),
+//               Map.empty
+//             )
+//           ),
+//           Map.empty
+//         )
+//       ),
+//       Map.empty
+//     )
 
-    val result = Handrail
-      .eval(
-        expression,
-        data,
-        HelpersRegistry.default
-      )
+//     val result = Handrail
+//       .eval(
+//         expression,
+//         data,
+//         HelpersRegistry.default
+//       )
 
-    assertEquals(result, ast.Expression.Value.String("bar"))
-  }
+//     assertEquals(result, model.Expression.Value.String("perch&eacute;"))
+//   }
 
-  test("{{#unless}} should evaluate body when false") {
-    val data = ast.Expression.Value.Object(Map("foo" -> ast.Expression.Value.String("perché")))
-    val expression = ast.Expression.Function(
-      "render",
-      List(
-        ast.Expression.Function(
-          "unless",
-          List(
-            ast.Expression.Value.Boolean(false)
-          ),
-          Map(
-            "body" -> ast.Expression.Function(
-              "render",
-              List(ast.Expression.Value.String("foo"))
-            ),
-            "else" -> ast.Expression.Function(
-              "render",
-              List(ast.Expression.Value.String("bar"))
-            )
-          )
-        )
-      ),
-      Map.empty
-    )
+//   test("{{#if}} should evaluate body when true") {
+//     val data = model.Expression.Value.Object(Map("foo" -> model.Expression.Value.String("perché")))
+//     val expression = model.Expression.Function(
+//       "render",
+//       List(
+//         model.Expression.Function(
+//           "if",
+//           List(
+//             model.Expression.Value.Boolean(true)
+//           ),
+//           Map(
+//             "body" -> model.Expression.Function(
+//               "render",
+//               List(model.Expression.Value.String("foo"))
+//             )
+//           )
+//         )
+//       ),
+//       Map.empty
+//     )
 
-    val result = Handrail
-      .eval(
-        expression,
-        data,
-        HelpersRegistry.default
-      )
+//     val result = Handrail
+//       .eval(
+//         expression,
+//         data,
+//         HelpersRegistry.default
+//       )
 
-    assertEquals(result, ast.Expression.Value.String("foo"))
-  }
+//     assertEquals(result, model.Expression.Value.String("foo"))
+//   }
 
-  test("{{#unless}} should evaluate else when true") {
-    val data = ast.Expression.Value.Object(Map("foo" -> ast.Expression.Value.String("perché")))
-    val expression = ast.Expression.Function(
-      "render",
-      List(
-        ast.Expression.Function(
-          "unless",
-          List(
-            ast.Expression.Value.Boolean(true)
-          ),
-          Map(
-            "body" -> ast.Expression.Function(
-              "render",
-              List(ast.Expression.Value.String("foo"))
-            ),
-            "else" -> ast.Expression.Function(
-              "render",
-              List(ast.Expression.Value.String("bar"))
-            )
-          )
-        )
-      ),
-      Map.empty
-    )
+//   stringBuilderR.test("{{#if}} should evaluate else when false") { sb =>
+//     val data = model.Expression.Value.Object(Map("foo" -> model.Expression.Value.String("perché")))
+//     val expression = model.Expression.Function(
+//       "render",
+//       List(
+//         model.Expression.Function(
+//           "if",
+//           List(
+//             model.Expression.Value.Boolean(false)
+//           ),
+//           Map(
+//             "body" -> model.Expression.Function(
+//               "render",
+//               List(model.Expression.Value.String("foo"))
+//             ),
+//             "else" -> model.Expression.Function(
+//               "render",
+//               List(model.Expression.Value.String("bar"))
+//             )
+//           )
+//         )
+//       ),
+//       Map.empty
+//     )
 
-    val result = Handrail
-      .eval(
-        expression,
-        data,
-        HelpersRegistry.default
-      )
+//     val result = Handrail
+//       .eval(
+//         expression,
+//         data,
+//         HelpersRegistry.default
+//       )
 
-    assertEquals(result, ast.Expression.Value.String("bar"))
-  }
+//     assertEquals(result, model.Expression.Value.String("bar"))
+//   }
 
-  test("template should concatenate expressions values") {
-    val data = ast.Expression.Value.Object(Map.empty)
-    val expression = ast.Expression.Function(
-      "template",
-      List(
-        ast.Expression.Value.Array(
-          List(
-            ast.Expression.Function(
-              "render",
-              List(
-                ast.Expression.Value.String("foo")
-              ),
-              Map.empty
-            ),
-            ast.Expression.Function(
-              "render",
-              List(
-                ast.Expression.Value.String("bar")
-              ),
-              Map.empty
-            )
-          )
-        )
-      ),
-      Map.empty
-    )
+//   test("{{#unless}} should evaluate body when false") {
+//     val data = model.Expression.Value.Object(Map("foo" -> model.Expression.Value.String("perché")))
+//     val expression = model.Expression.Function(
+//       "render",
+//       List(
+//         model.Expression.Function(
+//           "unless",
+//           List(
+//             model.Expression.Value.Boolean(false)
+//           ),
+//           Map(
+//             "body" -> model.Expression.Function(
+//               "render",
+//               List(model.Expression.Value.String("foo"))
+//             ),
+//             "else" -> model.Expression.Function(
+//               "render",
+//               List(model.Expression.Value.String("bar"))
+//             )
+//           )
+//         )
+//       ),
+//       Map.empty
+//     )
 
-    val result = Handrail
-      .eval(
-        expression,
-        data,
-        HelpersRegistry.default
-      )
+//     val result = Handrail
+//       .eval(
+//         expression,
+//         data,
+//         HelpersRegistry.default
+//       )
 
-    assertEquals(result, ast.Expression.Value.String("foobar"))
-  }
+//     assertEquals(result, model.Expression.Value.String("foo"))
+//   }
 
-  test("Handrail should compile and fill a simple template") {
-    val data = ast.Expression.Value.Object(Map("name" -> ast.Expression.Value.String("John")))
+//   test("{{#unless}} should evaluate else when true") {
+//     val data = model.Expression.Value.Object(Map("foo" -> model.Expression.Value.String("perché")))
+//     val expression = model.Expression.Function(
+//       "render",
+//       List(
+//         model.Expression.Function(
+//           "unless",
+//           List(
+//             model.Expression.Value.Boolean(true)
+//           ),
+//           Map(
+//             "body" -> model.Expression.Function(
+//               "render",
+//               List(model.Expression.Value.String("foo"))
+//             ),
+//             "else" -> model.Expression.Function(
+//               "render",
+//               List(model.Expression.Value.String("bar"))
+//             )
+//           )
+//         )
+//       ),
+//       Map.empty
+//     )
 
-    val source = """Hello, {{name}}"""
+//     val result = Handrail
+//       .eval(
+//         expression,
+//         data,
+//         HelpersRegistry.default
+//       )
 
-    val template = HandlebarsParser.TemplateP.parseAll(source).getOrElse(throw new RuntimeException)
+//     assertEquals(result, model.Expression.Value.String("bar"))
+//   }
 
-    val result = Handrail
-      .eval(
-        template,
-        data,
-        HelpersRegistry.default
-      )
+//   test("template should concatenate expressions values") {
+//     val data = model.Expression.Value.Object(Map.empty)
+//     val expression = model.Expression.Function(
+//       "template",
+//       List(
+//         model.Expression.Value.Array(
+//           List(
+//             model.Expression.Function(
+//               "render",
+//               List(
+//                 model.Expression.Value.String("foo")
+//               ),
+//               Map.empty
+//             ),
+//             model.Expression.Function(
+//               "render",
+//               List(
+//                 model.Expression.Value.String("bar")
+//               ),
+//               Map.empty
+//             )
+//           )
+//         )
+//       ),
+//       Map.empty
+//     )
 
-    assertEquals(result, ast.Expression.Value.String("Hello, John"))
-  }
+//     val result = Handrail
+//       .eval(
+//         expression,
+//         data,
+//         HelpersRegistry.default
+//       )
+
+//     assertEquals(result, model.Expression.Value.String("foobar"))
+//   }
+
+//   test("Handrail should compile and fill a simple template") {
+//     val data = model.Expression.Value.Object(Map("name" -> model.Expression.Value.String("John")))
+
+//     val source = """Hello, {{name}}"""
+
+//     val template = HandlebarsParser.TemplateP.parseAll(source).getOrElse(throw new RuntimeException)
+
+//     val result = Handrail
+//       .eval(
+//         template,
+//         data,
+//         HelpersRegistry.default
+//       )
+
+//     assertEquals(result, model.Expression.Value.String("Hello, John"))
+//   }
 }

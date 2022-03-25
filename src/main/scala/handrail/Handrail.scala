@@ -1,5 +1,4 @@
 package handrail
-import ast._
 import fs2._
 
 import cats.effect._
@@ -9,6 +8,7 @@ import org.typelevel.log4cats.slf4j.Slf4jLogger
 import org.typelevel.log4cats.StructuredLogger
 import cats.Applicative
 
+import handrail.model._
 /*
  *
  * The argument of the functions are by default context property, unless they are number, or boolean, or in ""
@@ -24,42 +24,53 @@ import cats.Applicative
  */
 object Handrail {
 
-  def parse(source: String): Either[Throwable, Expression] = {
-    HandlebarsParser.TemplateP
+  def parse(source: String, helpersRegistry: HelpersRegistry): Either[HandrailParseError, Template] = {
+    val expression = new HandlebarsParser(helpersRegistry).TemplateP
       .parseAll(source)
-      .leftMap(e => new RuntimeException(e.toString))
-  }
+      .leftMap(e => new HandrailParseError(e.toString))
 
-  def eval(
-      expression: Expression,
-      data: Expression.Value,
-      helpersRegistry: HelpersRegistry
-  ): Expression.Value = {
-
-    def eval(expression: Expression, data: Expression.Value): Expression.Value = expression match {
-      case value: Expression.Value => value
-      case Expression.Function(name, posArgs, namedArgs) =>
-        helpersRegistry.helpers
-          .get(name)
-          .map { helper =>
-            helper(
-              positionalArgs = posArgs,
-              nominalArgs = namedArgs,
-              data = data,
-              eval = eval _
-            )
+    expression.map { exp =>
+      new Template {
+        def apply(data: Expression.Value): Either[HandrailExecutionError, String] = {
+          exp.eval(data) match {
+            case Expression.Value.String(value) => value.asRight[HandrailExecutionError]
+            case other => HandrailExecutionError(s"$other is not a valid String").asLeft
           }
-          .getOrElse {
-            if (posArgs.isEmpty && namedArgs.isEmpty) {
-              Helper.Lookup(List(data, ast.Expression.Value.String(name)), Map.empty, data, eval _)
-            } else {
-              // TODO Use missing helper
-              ast.Expression.Value.Void
-            }
-          }
+        }
+      }
     }
-
-    eval(expression, data)
   }
+
+  // def eval(
+  //     expression: Expression,
+  //     data: Expression.Value,
+  //     helpersRegistry: HelpersRegistry
+  // ): Expression.Value = {
+
+  //   def eval(expression: Expression, data: Expression.Value): Expression.Value = expression match {
+  //     case value: Expression.Value => value
+  //     case Expression.Function(name, posArgs, namedArgs) =>
+  //       helpersRegistry.helpers
+  //         .get(name)
+  //         .map { helper =>
+  //           helper(
+  //             positionalArgs = posArgs,
+  //             nominalArgs = namedArgs,
+  //             data = data,
+  //             eval = eval _
+  //           )
+  //         }
+  //         .getOrElse {
+  //           if (posArgs.isEmpty && namedArgs.isEmpty) {
+  //             Helper.Lookup(List(data, model.Expression.Value.String(name)), Map.empty, data, eval _)
+  //           } else {
+  //             // TODO Use missing helper
+  //             model.Expression.Value.Void
+  //           }
+  //         }
+  //   }
+
+  //   eval(expression, data)
+  // }
 
 }
