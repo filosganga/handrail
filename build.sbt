@@ -1,5 +1,5 @@
 val catsV = "2.7.0"
-val catsEffectV = "3.3.8"
+val catsEffectV = "3.3.10"
 val catsParseV = "0.3.6"
 val enumeratumV = "1.7.0"
 val caseInsensitiveV = "1.2.0"
