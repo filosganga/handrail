@@ -7,7 +7,7 @@ val munitV = "0.7.29"
 val munitCatsEffectV = "1.0.7"
 val scalacheckEffectV = "1.0.3"
 val log4j2V = "2.17.2"
-val log4catsV = "2.2.0"
+val log4catsV = "2.4.0"
 val fs2V = "3.2.5"
 val apacheCommonsTextV = "1.9"
 
