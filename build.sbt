@@ -13,7 +13,7 @@ val apacheCommonsTextV = "1.9"
 
 Global / onChangedBuildSource := ReloadOnSourceChanges
 
-ThisBuild / scalaVersion := "2.13.8"
+ThisBuild / scalaVersion := "2.13.10"
 ThisBuild / organizationName := "Filippo De Luca"
 ThisBuild / dynverSeparator := "-"
 ThisBuild / evictionErrorLevel := Level.Warn
