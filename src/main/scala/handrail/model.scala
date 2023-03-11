@@ -2,21 +2,33 @@ package handrail
 
 import scala.collection.immutable
 
+import cats.syntax.all._
+
 object model {
 
-  abstract class HandrailError(reason: String) extends RuntimeException(reason)
+  case class Context(value: Expression.Value, parent: Option[Context] = None) {
+    def child(value: Expression.Value) = Context(value, this.some)
+    def withValue(value: Expression.Value) = copy(value = value)
+  }
+
+  object Context {
+    val void = Context(Expression.Value.Void, None)
+  }
+
+  sealed abstract class HandrailError(reason: String) extends RuntimeException(reason)
   case class HandrailParseError(reason: String) extends HandrailError(reason)
   case class HandrailExecutionError(reason: String) extends HandrailError(reason)
 
   sealed trait Expression {
-    def eval(value: Expression.Value): Expression.Value = this match {
-      case v: Expression.Value => v
-      case fn: Expression.Function => fn(value)
-    }
+    def apply(ctx: Context): Context
   }
 
   object Expression {
-    sealed trait Value extends Expression
+    // TODO add error expression
+    sealed trait Value extends Expression {
+      def apply(ctx: Context): Context = ctx.copy(value = this)
+    }
+
     object Value {
       // TODO Add safestring
       case class String(value: scala.Predef.String) extends Value
@@ -26,9 +38,11 @@ object model {
       case class Object(value: Map[scala.Predef.String, Expression.Value]) extends Value
       case object Void extends Value
     }
+
     trait Function extends Expression {
-      def apply(value: Expression.Value): Expression.Value
+      def apply(context: Context): Context
     }
+
   }
 
   trait Template {

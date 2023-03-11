@@ -1,11 +1,39 @@
 package handrail
 
 import cats.syntax.all._
-import cats.parse._
+import cats.parse.{Parser0 => P0, Parser => P, Numbers}
+
+import handrail.model._
+import cats.data.Chain
 
 class HandlebarsParserSuite extends munit.FunSuite {
 
-  // import HandlebarsParser._
+  test("Handlebars should parse {{foo}}") {
+    val source = "foo"
+    val result = new HandlebarsParser(HelpersRegistry.default.withHelper("loud", Loud)).HelperP.parseAll(source)
+
+    result.left.map(e => println(e.toString()))
+
+    assert(result.isRight, result)
+  }
+
+  test("Handlebars should parse {{\"foo\"}}") {
+    val source = "\"foo\""
+    val result = new HandlebarsParser(HelpersRegistry.default.withHelper("loud", Loud)).HelperP.parseAll(source)
+
+    result.left.map(e => println(e.toString()))
+
+    assert(result.isRight, result)
+  }
+
+  test("Handlebars should parse {{loud foo}}") {
+    val source = "loud foo"
+    val result = new HandlebarsParser(HelpersRegistry.default.withHelper("loud", Loud)).HelperP.parseAll(source)
+
+    result.left.map(e => println(e.toString()))
+
+    assert(result.isRight, result)
+  }
 
   // test("Identifier should parse an identifier before space") {
   //   val source = "foo   "

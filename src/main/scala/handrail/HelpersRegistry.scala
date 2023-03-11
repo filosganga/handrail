@@ -3,13 +3,13 @@ package handrail
 import fs2._
 
 import cats.Show
+import cats.MonadThrow
 import cats.data.OptionT
 import cats.effect._
 import cats.syntax.all._
 
 import org.apache.commons.text.StringEscapeUtils
 import org.typelevel.log4cats.slf4j.Slf4jLogger
-import cats.MonadThrow
 
 import handrail.model._
 
@@ -38,10 +38,10 @@ object HelpersRegistry {
         nominalArgs: Map[String, Expression]
     ) = new Expression.Function {
 
-      def apply(data: Expression.Value) = {
+      override def apply(ctx: Context): Context = {
         if (!positionalArgs.isEmpty) {
           val value = positionalArgs.head
-          value.eval(data) match {
+          val newValue = value(ctx).value match {
             case value: Expression.Value.String => value
             case Expression.Value.Boolean(value) => Expression.Value.String(value.toString)
             case Expression.Value.Number(value) => Expression.Value.String(value.toString)
@@ -49,6 +49,8 @@ object HelpersRegistry {
             case Expression.Value.Array(values) => Expression.Value.String(values.toString)
             case Expression.Value.Void => Expression.Value.String("")
           }
+
+          ctx.withValue(newValue)
         } else {
           // TODO nononono
           throw new RuntimeException("argument 'value' not found")
@@ -63,11 +65,11 @@ object HelpersRegistry {
         nominalArgs: Map[String, Expression]
     ) = new Expression.Function {
 
-      def apply(data: Expression.Value) = {
+      override def apply(ctx: Context) = {
 
         if (!positionalArgs.isEmpty) {
           val value = positionalArgs.head
-          value.eval(data) match {
+          val newValue = value(ctx).value match {
             case Expression.Value.String(value) => Expression.Value.String(StringEscapeUtils.escapeHtml4(value))
             case Expression.Value.Boolean(value) =>
               Expression.Value.String(StringEscapeUtils.escapeHtml4(value.toString))
@@ -79,6 +81,7 @@ object HelpersRegistry {
               Expression.Value.String(StringEscapeUtils.escapeHtml4(values.toString))
             case Expression.Value.Void => Expression.Value.String("")
           }
+          ctx.copy(value = newValue)
         } else {
           // TODO nononono
           throw new RuntimeException("argument 'value' not found")
@@ -93,33 +96,34 @@ object HelpersRegistry {
         nominalArgs: Map[String, Expression]
     ) = new Expression.Function {
 
-      def apply(data: Expression.Value) = {
+      override def apply(ctx: Context) = {
 
         if (positionalArgs.size == 2) {
           val iterator = positionalArgs.iterator
           val targetExp = iterator.next
           val propertyExp = iterator.next
 
-          val target = targetExp.eval(data)
-
-          val property = propertyExp.eval(data) match {
+          val target = targetExp(ctx)
+          val property = propertyExp(ctx).value match {
             case Expression.Value.String(x) => x
             case x: Expression.Value => throw new RuntimeException(s"value of property ${x} is not a String")
           }
 
-          val result = property match {
+          def resolveValue(property: String, target: Context): Context = property match {
             case "." | "this" => target
-            // TODO get parent
-            case ".." => target
+            case ".." => target.parent.getOrElse(Context.void) // TODO get parent
             case key =>
-              target match {
+              val nextValue = target.value match {
                 case Expression.Value.Object(value) =>
                   // TODO use the missing helper
                   value.getOrElse(key, Expression.Value.Void)
                 // TODO use the missing helper
                 case other => Expression.Value.Void
               }
+              target.child(nextValue)
           }
+
+          val result = resolveValue(property, target)
 
           println(s"'${property}' of '${target}' is '${result}'")
 
@@ -132,12 +136,13 @@ object HelpersRegistry {
     }
   }
 
+  // TODO Remove it
   object This extends Helper {
     def apply(
         positionalArgs: List[Expression],
         nominalArgs: Map[String, Expression]
     ) = new Expression.Function {
-      def apply(data: Expression.Value) = data
+      override def apply(ctx: Context) = ctx
     }
   }
 
@@ -147,13 +152,14 @@ object HelpersRegistry {
         positionalArgs: List[Expression],
         nominalArgs: Map[String, Expression]
     ) = new Expression.Function {
-      def apply(data: Expression.Value): Expression.Value = {
+      override def apply(ctx: Context): Context = {
+
         val valueExp = nominalArgs
           .get("value")
           .orElse(positionalArgs.headOption)
           .getOrElse(throw new RuntimeException("argument 'value' not found"))
 
-        val value = valueExp.eval(data) match {
+        val value = valueExp(ctx).value match {
           case Expression.Value.Boolean(value) => value
           case Expression.Value.Void => false
           case _ => true
@@ -166,9 +172,9 @@ object HelpersRegistry {
           .getOrElse("else", Expression.Value.Void)
 
         if (value) {
-          bodyExp.eval(data)
+          bodyExp(ctx)
         } else {
-          elseExp.eval(data)
+          elseExp(ctx)
         }
       }
 
@@ -180,17 +186,19 @@ object HelpersRegistry {
         positionalArgs: List[Expression],
         nominalArgs: Map[String, Expression]
     ) = new Expression.Function {
-      def apply(data: Expression.Value): Expression.Value = {
+      override def apply(ctx: Context): Context = {
         val valueExp = nominalArgs
           .get("value")
           .orElse(positionalArgs.headOption)
           .getOrElse(throw new RuntimeException("argument 'value' not found"))
 
-        valueExp.eval(data) match {
+        val newValue = valueExp(ctx).value match {
           case Expression.Value.Boolean(value) => Expression.Value.Boolean(!value)
           case Expression.Value.Void => Expression.Value.Boolean(true)
           case _ => Expression.Value.Boolean(false)
         }
+
+        ctx.withValue(newValue)
       }
     }
   }
@@ -200,7 +208,7 @@ object HelpersRegistry {
         positionalArgs: List[Expression],
         nominalArgs: Map[String, Expression]
     ) = new Expression.Function {
-      def apply(data: Expression.Value): Expression.Value = {
+      override def apply(ctx: Context): Context = {
         val valueExp = nominalArgs
           .get("value")
           .orElse(positionalArgs.headOption)
@@ -208,7 +216,7 @@ object HelpersRegistry {
 
         // TODO Can we return the expression wrapped somehow instead?
         val newValue = Not(List(valueExp), Map.empty)
-        If(List(newValue), nominalArgs - "value")(data)
+        If(List(newValue), nominalArgs - "value")(ctx)
       }
     }
   }
@@ -218,11 +226,11 @@ object HelpersRegistry {
         positionalArgs: List[Expression],
         nominalArgs: Map[String, Expression]
     ) = new Expression.Function {
-      def apply(data: Expression.Value): Expression.Value = {
+      override def apply(ctx: Context): Context = {
 
         if (positionalArgs.nonEmpty) {
           val values = positionalArgs.head
-          val nestedExps: Iterable[Expression] = values.eval(data) match {
+          val nestedExps: Iterable[Expression] = values(ctx).value match {
             case Expression.Value.Array(exps) => exps
             case other => throw new RuntimeException("The values must be an array")
           }
@@ -230,14 +238,14 @@ object HelpersRegistry {
           // TODO Capacity hint
           val sb = new StringBuilder()
           nestedExps.foreach { exp =>
-            exp.eval(data) match {
+            exp(ctx).value match {
               case Expression.Value.String(value) => sb.append(value)
               case Expression.Value.Void =>
               case other => throw new RuntimeException("The template nested expressions must return string or void")
             }
           }
 
-          Expression.Value.String(sb.toString)
+          ctx.withValue(Expression.Value.String(sb.toString))
         } else {
           throw new RuntimeException("The values must be an array")
         }
@@ -247,8 +255,8 @@ object HelpersRegistry {
 
   val empty = HelpersRegistry(Map.empty)
   val default = empty
-    .withHelper("this", HelpersRegistry.This)
-    .withHelper(".", HelpersRegistry.This)
+    .withHelper("this", HelpersRegistry.This) // TODO implement with lookup . .
+    .withHelper(".", HelpersRegistry.This) // TODO implement with lookup . .
     .withHelper("lookup", HelpersRegistry.Lookup)
     .withHelper("render", HelpersRegistry.Render)
     .withHelper("template", HelpersRegistry.Template)

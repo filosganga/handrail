@@ -10,7 +10,7 @@ class HandrailSuite extends munit.CatsEffectSuite {
 
   val stringBuilderR = ResourceFixture(Resource.make(IO(new StringBuilder))(sb => IO(sb.clear)))
 
-  test("it should render {{this}}") {
+  test("Handrail should render {{this}}") {
     val result =
       Handrail.parse("{{this}}", HelpersRegistry.default).flatMap { template =>
         template(Expression.Value.String("foo")).leftWiden[HandrailError]
@@ -19,7 +19,7 @@ class HandrailSuite extends munit.CatsEffectSuite {
     assertEquals(result, "foo".asRight[HandrailError])
   }
 
-  test("it should render {{.}}") {
+  test("Handrail should render {{.}}") {
     val result =
       Handrail.parse("{{.}}", HelpersRegistry.default).flatMap { template =>
         template(Expression.Value.String("foo")).leftWiden[HandrailError]
@@ -28,7 +28,7 @@ class HandrailSuite extends munit.CatsEffectSuite {
     assertEquals(result, "foo".asRight[HandrailError])
   }
 
-  test("it should render {{foo}}") {
+  test("Handrail should render {{foo}}") {
     val result =
       Handrail.parse("{{foo}}", HelpersRegistry.default).flatMap { template =>
         template(Expression.Value.Object(Map("foo" -> Expression.Value.String("bar")))).leftWiden[HandrailError]
@@ -37,7 +37,18 @@ class HandrailSuite extends munit.CatsEffectSuite {
     assertEquals(result, "bar".asRight[HandrailError])
   }
 
-  test("it should render {{foo.bar}}") {
+  test("Handrail should render {{loud foo}}") {
+
+    val helpers = HelpersRegistry.default.withHelper("loud", Loud)
+    val result =
+      Handrail.parse("{{loud foo}}", helpers).flatMap { template =>
+        template(Expression.Value.Object(Map("foo" -> Expression.Value.String("bar")))).leftWiden[HandrailError]
+      }
+
+    assertEquals(result, "BAR".asRight[HandrailError])
+  }
+
+  test("Handrail should render {{foo.bar}}") {
     val result =
       Handrail.parse("{{foo.bar}}", HelpersRegistry.default).flatMap { template =>
         template(

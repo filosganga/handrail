@@ -27,12 +27,16 @@ object Handrail {
   def parse(source: String, helpersRegistry: HelpersRegistry): Either[HandrailParseError, Template] = {
     val expression = new HandlebarsParser(helpersRegistry).TemplateP
       .parseAll(source)
+      .onError { e =>
+        println(s"Parser error: ${e.expected}")
+        e.asLeft
+      }
       .leftMap(e => new HandrailParseError(e.toString))
 
     expression.map { exp =>
       new Template {
         def apply(data: Expression.Value): Either[HandrailExecutionError, String] = {
-          exp.eval(data) match {
+          exp(Context(data)).value match {
             case Expression.Value.String(value) => value.asRight[HandrailExecutionError]
             case other => HandrailExecutionError(s"$other is not a valid String").asLeft
           }

@@ -73,26 +73,42 @@ class HandlebarsParser(helpersRegistry: HelpersRegistry) {
       WhiteSpace.? *> EndEscapedComment
     ) <* WhiteSpace.?) ~ EndExpr).as(model.Expression.Value.Void)
 
+  /*
+   * Parsing of expressions
+   *
+   * {foo} - {lookup . "foo"}
+   * {foo.bar} - {lookup (lookup . "foo") "bar"}
+   * {loud foo.bar} - {loud (lookup (lookup . "foo") "bar")}
+   * {../foo} {lookup (lookup . "..") "foo"}
+   * {./foo} - {lookup . "foo"}
+   * {[foo.bar]} - {lookup . "foo.bar"}
+   * {foo.[0]} - {lookup (lookup . "foo") 0}
+   * {foo.[0].bar} - {lookup (lookup (lookup . "foo") 0) "bar"}
+   */
   val HelperP: Parser[model.Expression.Function] = {
 
-    val HelperNameP: Parser[String] = Quote *> Parser.until(Quote) <* Quote | Parser.until(Stop)
+    val HelperNameP: Parser[String] =
+      (Quote *> Parser.until(Quote) <* Quote | Parser.until(Stop))
 
     lazy val ParameterValueP: Parser[model.Expression] =
-      Parser.oneOf(
-        List(
-          ValueLiteralP,
-          Parser.defer(HelperP).between(OpenParen *> WhiteSpace.rep0, WhiteSpace.rep0 <* CloseParen)
+      Parser
+        .oneOf(
+          List(
+            ValueLiteralP,
+            Parser.defer(HelperP).between(OpenParen *> WhiteSpace.rep0, WhiteSpace.rep0 <* CloseParen),
+            Parser.defer(onlyHelpeNameP)
+          )
         )
-      )
+        .withContext("ParameterValueP")
 
     lazy val PositionalParametersP: Parser0[List[model.Expression]] =
       ParameterValueP.repSep0(WhiteSpace.rep0).withContext("PositionalParametersP")
 
-    val NominalParameterP: Parser[(String, model.Expression)] =
-      (Parser.until(WhiteSpace | Equal) <* Equal
-        .surroundedBy(WhiteSpace.rep0)) ~ ParameterValueP
+    lazy val NominalParameterP: Parser[(String, model.Expression)] =
+      ((Parser.until(WhiteSpace | Equal) <* Equal
+        .surroundedBy(WhiteSpace.rep0)) ~ ParameterValueP).withContext("NominalParameterP")
 
-    val NominalParametersP: Parser0[Map[String, model.Expression]] =
+    lazy val NominalParametersP: Parser0[Map[String, model.Expression]] =
       NominalParameterP
         .repSep0(WhiteSpace.rep)
         .map { xs =>
@@ -100,15 +116,16 @@ class HandlebarsParser(helpersRegistry: HelpersRegistry) {
         }
         .withContext("NominalParametersP")
 
-    val onlyHelpeNamerP = HelperNameP.map { case helperName =>
-      helpersRegistry.helper(helperName).map(helper => helper(List.empty, Map.empty)).getOrElse {
-        lookupHelper(List(thisFunction, Expression.Value.String(helperName)), Map.empty)
+    lazy val onlyHelpeNameP = HelperNameP
+      .map { case helperName =>
+        helpersRegistry.helper(helperName).map(helper => helper(List.empty, Map.empty)).getOrElse {
+          lookupHelper(List(thisFunction, Expression.Value.String(helperName)), Map.empty)
+        }
       }
+      .withContext("onlyHelpeNameP")
 
-    }
-
-    val withNominalArgs = (HelperNameP ~ (WhiteSpace.rep *> NominalParametersP)).map {
-      case (helperName, namedArguments) =>
+    val withNominalArgs = (HelperNameP ~ (WhiteSpace.rep *> NominalParametersP))
+      .map { case (helperName, namedArguments) =>
         val helper = helpersRegistry
           .helper(helperName)
           .orElse(missingHelper)
@@ -116,10 +133,11 @@ class HandlebarsParser(helpersRegistry: HelpersRegistry) {
             throw new IllegalStateException(s"helper '${helperName}' not found and missing helper is not registered")
           )
         helper(List.empty, namedArguments)
-    }
+      }
+      .withContext("withNominalArgs")
 
-    val withPositionalArgs = (HelperNameP ~ (WhiteSpace.rep *> PositionalParametersP)).map {
-      case (helperName, positionalArguments) =>
+    val withPositionalArgs = (HelperNameP ~ (WhiteSpace.rep *> PositionalParametersP))
+      .map { case (helperName, positionalArguments) =>
         val helper = helpersRegistry
           .helper(helperName)
           .orElse(missingHelper)
@@ -127,11 +145,12 @@ class HandlebarsParser(helpersRegistry: HelpersRegistry) {
             throw new IllegalStateException(s"helper '${helperName}' not found and missing helper is not registered")
           )
         helper(positionalArguments, Map.empty)
-    }
+      }
+      .withContext("withPositionalArgs")
 
     val withPositionalAndNominalArgs =
-      (HelperNameP ~ (WhiteSpace.rep *> PositionalParametersP) ~ (WhiteSpace.rep *> NominalParametersP)).map {
-        case ((helperName, positionalArguments), namedArguments) =>
+      (HelperNameP ~ (WhiteSpace.rep *> PositionalParametersP) ~ (WhiteSpace.rep *> NominalParametersP))
+        .map { case ((helperName, positionalArguments), namedArguments) =>
           val helper = helpersRegistry
             .helper(helperName)
             .orElse(missingHelper)
@@ -139,14 +158,15 @@ class HandlebarsParser(helpersRegistry: HelpersRegistry) {
               throw new IllegalStateException(s"helper '${helperName}' not found and missing helper is not registered")
             )
           helper(positionalArguments, namedArguments)
-      }
+        }
+        .withContext("withPositionalAndNominalArgs")
 
     Parser.oneOf(
       List(
         withPositionalAndNominalArgs.backtrack,
         withNominalArgs.backtrack,
         withPositionalArgs.backtrack,
-        onlyHelpeNamerP.backtrack
+        onlyHelpeNameP.backtrack
       )
     )
 
