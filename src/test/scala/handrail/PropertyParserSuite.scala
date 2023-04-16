@@ -6,6 +6,14 @@ import cats.parse.{Parser0 => P0, Parser => P, Numbers, Rfc5234}
 import handrail.model._
 import cats.data.Chain
 
+/**   - {{ 'foo' }} -> render(ctx.withValue("foo"))
+  *   - {{ this }} -> render(this(ctx))
+  *   - {{ . }} -> render(this(ctx))
+  *   - {{ foo }} -> render(foo(ctx) | lookup(this(), "foo"))
+  *   - {{ foo 'foo'}} -> render(foo('foo'))
+  *   - {{ ./foo }} -> render(lookup(this(), "foo"))
+  *   - {{#foo a b c}}bar{{/foo }}-> render(foo(a, b, b, body="bar"))
+  */
 class PropertyParserSuite extends munit.FunSuite {
 
   sealed trait Property
