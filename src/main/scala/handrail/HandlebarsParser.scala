@@ -76,14 +76,14 @@ class HandlebarsParser(helpersRegistry: HelpersRegistry) {
   /*
    * Parsing of expressions
    *
-   * {foo} - {lookup . "foo"}
-   * {foo.bar} - {lookup (lookup . "foo") "bar"}
-   * {loud foo.bar} - {loud (lookup (lookup . "foo") "bar")}
-   * {../foo} {lookup (lookup . "..") "foo"}
-   * {./foo} - {lookup . "foo"}
-   * {[foo.bar]} - {lookup . "foo.bar"}
-   * {foo.[0]} - {lookup (lookup . "foo") 0}
-   * {foo.[0].bar} - {lookup (lookup (lookup . "foo") 0) "bar"}
+   * {foo} - {lookup this "foo"}
+   * {foo.bar} - {lookup (lookup this "foo") "bar"}
+   * {loud foo.bar} - {loud (lookup (lookup this "foo") "bar")}
+   * {../foo} {lookup (lookup this "..") "foo"}
+   * {./foo} - {lookup this "foo"}
+   * {[foo.bar]} - {lookup this "foo.bar"}
+   * {foo.[0]} - {lookup (lookup this "foo") 0}
+   * {foo.[0].bar} - {lookup (lookup (lookup this "foo") 0) "bar"}
    */
   val HelperP: Parser[model.Expression.Function] = {
 

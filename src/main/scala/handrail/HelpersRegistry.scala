@@ -98,7 +98,7 @@ object HelpersRegistry {
 
       override def apply(ctx: Context) = {
 
-        if (positionalArgs.size == 2) {
+        if (positionalArgs.size == 2) { // Shall we be so strict?
           val iterator = positionalArgs.iterator
           val targetExp = iterator.next
           val propertyExp = iterator.next
@@ -111,7 +111,7 @@ object HelpersRegistry {
 
           def resolveValue(property: String, target: Context): Context = property match {
             case "." | "this" => target
-            case ".." => target.parent.getOrElse(Context.void) // TODO get parent
+            case ".." => target.parent.getOrElse(Context.void)
             case key =>
               val nextValue = target.value match {
                 case Expression.Value.Object(value) =>
