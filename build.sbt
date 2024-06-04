@@ -4,7 +4,7 @@ val catsParseV = "0.3.6"
 val enumeratumV = "1.7.0"
 val caseInsensitiveV = "1.2.0"
 val munitV = "0.7.29"
-val munitCatsEffectV = "1.0.7"
+val munitCatsEffectV = "2.0.0"
 val scalacheckEffectV = "1.0.3"
 val log4j2V = "2.17.2"
 val log4catsV = "2.2.0"
@@ -35,7 +35,7 @@ lazy val handrail = (project in file("."))
     libraryDependencies ++= Seq(
       "org.scalameta" %% "munit" % munitV % Test,
       "org.scalameta" %% "munit-scalacheck" % munitV % Test,
-      "org.typelevel" %% "munit-cats-effect-3" % munitCatsEffectV % Test,
+      "org.typelevel" %% "munit-cats-effect" % munitCatsEffectV % Test,
       "org.typelevel" %% "scalacheck-effect-munit" % scalacheckEffectV % Test,
       "com.beachape" %% "enumeratum" % enumeratumV,
       "org.typelevel" %% "cats-core" % catsV,
